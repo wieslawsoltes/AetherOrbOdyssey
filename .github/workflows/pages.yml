@@ -6,6 +6,9 @@ on:
   pull_request:
     branches: [main]
   workflow_dispatch:
+  workflow_run:
+    workflows: [Apply iPhone audio repair]
+    types: [completed]
 
 permissions:
   contents: read
@@ -16,6 +19,10 @@ concurrency:
 
 jobs:
   build:
+    if: >-
+      (github.event_name != 'workflow_run' ||
+       (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main')) &&
+      (github.event_name != 'push' || !contains(github.event.head_commit.message, '[audio-repair]'))
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -28,6 +35,11 @@ jobs:
         with:
           node-version: '24'
           package-manager-cache: false
+      - name: Ensure audio compatibility encoder
+        run: |
+          if ! command -v ffmpeg >/dev/null || ! command -v ffprobe >/dev/null; then
+            sudo apt-get update && sudo apt-get install -y ffmpeg
+          fi
       - name: Verify source inventory
         run: python3 tools/manifest.py check
       - name: Test camera timeline and deployment tooling
@@ -52,6 +64,18 @@ jobs:
           exit 1
       - name: Build self-contained Pages runtime
         run: python3 tools/build_pages.py
+      - name: Install pinned audio browser tests
+        run: |
+          python3 -m pip install --disable-pip-version-check playwright==1.57.0
+          python3 -m playwright install --with-deps chromium webkit
+      - name: Verify real MP3 playback and recovery in Chromium and WebKit
+        run: python3 tests/audio_browser.py --root _site --engines chromium,webkit --report "$RUNNER_TEMP/audio-browser-results.json"
+      - name: Record audio validation scope
+        run: |
+          echo '## Audio validation (not a physical iPhone test)' >> "$GITHUB_STEP_SUMMARY"
+          echo '```json' >> "$GITHUB_STEP_SUMMARY"
+          cat "$RUNNER_TEMP/audio-browser-results.json" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
       - name: Upload Pages artifact
         if: github.event_name != 'pull_request'
         uses: actions/upload-pages-artifact@7b1f4a764d45c48632c6b24a0339c27f5614fb0b # v4

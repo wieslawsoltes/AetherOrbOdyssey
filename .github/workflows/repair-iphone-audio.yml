@@ -1,0 +1,97 @@
+name: Apply iPhone audio repair
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/repair-iphone-audio.yml
+      - docs/iphone-audio-patch/**
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: iphone-audio-repair
+  cancel-in-progress: false
+
+jobs:
+  repair:
+    if: github.repository == 'wieslawsoltes/AetherOrbOdyssey' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Check out the exact repair revision
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - name: Apply hash-verified audio source patch
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import hashlib, json, lzma
+          from pathlib import Path
+          root = Path.cwd().resolve()
+          raw = b''.join((root / f'docs/iphone-audio-patch/{i:02}.bin').read_bytes() for i in range(4))
+          if len(raw) != 21104 or hashlib.sha256(raw).hexdigest() != '3b2343d2828c2ae2fa4dd5c94914e6d342ee27c2dd3c54e439f30dffa78068fe':
+              raise SystemExit('Audio source patch failed integrity verification.')
+          patch = json.loads(lzma.decompress(raw))
+          allowed = {
+              'src/audio.js', 'src/app.js', 'index.html', 'tools/build_single.py',
+              'tools/encode_music.py', 'tools/build_pages.py', 'tools/verify_site.py',
+              'tests/audio.test.mjs', 'tests/test_encode_music.py', 'tests/audio_browser.py',
+              'docs/IPHONE-AUDIO.md', 'NOTICE.md',
+          }
+          if set(patch) != allowed:
+              raise SystemExit('Unexpected source paths in audio patch.')
+          # Validate every preimage before changing any file; never overwrite concurrent edits.
+          for name, item in patch.items():
+              path = root / name
+              if path.is_symlink() or not path.resolve().is_relative_to(root):
+                  raise SystemExit(f'Unsafe patch path: {name}')
+              current = path.read_bytes() if path.exists() else None
+              updated = item['content'].encode('utf-8')
+              if current == updated:
+                  continue
+              digest = hashlib.sha256(current).hexdigest() if current is not None else None
+              if digest != item['before']:
+                  raise SystemExit(f'Source changed since review: {name}. Refusing overwrite.')
+          for name, item in patch.items():
+              path = root / name
+              path.parent.mkdir(parents=True, exist_ok=True)
+              path.write_text(item['content'], encoding='utf-8')
+          print(f'Applied {len(patch)} integrity-verified source files.')
+          PY
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Ensure encoder for regression tests
+        run: |
+          if ! command -v ffmpeg >/dev/null || ! command -v ffprobe >/dev/null; then
+            sudo apt-get update && sudo apt-get install -y ffmpeg
+          fi
+      - name: Test audio state and compatibility encoding
+        run: |
+          npm test
+          python3 -m unittest discover -s tests -p 'test_*.py' -v
+          for file in src/*.js; do node --check "$file"; done
+          python3 -m compileall -q tools tests
+      - name: Regenerate standalone edition and complete source inventory
+        run: |
+          python3 tools/build_compat.py
+          python3 tools/build_single.py
+          python3 tools/manifest.py write
+          python3 tools/manifest.py check
+      - name: Commit verified fix without rewriting remote history
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/audio.js src/app.js index.html tools/build_single.py tools/encode_music.py tools/build_pages.py tools/verify_site.py tests/audio.test.mjs tests/test_encode_music.py tests/audio_browser.py docs/IPHONE-AUDIO.md NOTICE.md Aether-Orb-Odyssey.html MANIFEST.json
+          if git diff --cached --quiet; then
+            echo 'The verified fix is already committed.'
+          else
+            git commit -m 'Fix iPhone audio activation, playback session, codec compatibility and recovery'
+            git push origin HEAD:main
+          fi
