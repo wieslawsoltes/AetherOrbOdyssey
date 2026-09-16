@@ -20,28 +20,30 @@ jobs:
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
         with:
           ref: ${{ github.sha }}
-      - name: Refine actual browser regression checks
+      - name: Fix encoder input-ready ordering
         shell: python
         run: |
           from pathlib import Path
-          import hashlib
-          p = Path('tests/recording_browser.py')
+          p = Path('src/app.js')
           s = p.read_text()
-          replacements = [
-            ("launch['args']+=['--use-angle=swiftshader'", "launch['args']+=['--use-gl=angle','--use-angle=swiftshader'"),
-            ("elif args.chrome:launch['channel']='chrome'", "elif args.chrome:launch['channel']='chrome'\n        else:launch['channel']='chromium' # Full Chromium/new headless, not headless_shell."),
-            ("        page.on('pageerror',lambda e:report['errors'].append(str(e)))", "        page.on('pageerror',lambda e:report['errors'].append(str(e)))\n        report['console']=[]\n        page.on('console',lambda m:report['console'].append(m.type+': '+m.text) if m.type in ('warning','error') else None)"),
-            ("            await page.goto(origin+'/__capture_probe__')\n            native=await page.evaluate('async()=>!!(await navigator.gpu?.requestAdapter())')\n            if args.backend=='webgpu':assert native,'Native WebGPU adapter unavailable'\n            use_native=native and args.backend!='compat'", "            if args.backend=='auto':\n              await page.goto(origin+'/__capture_probe__')\n              native=await page.evaluate('async()=>!!(await navigator.gpu?.requestAdapter())')\n            else:native=args.backend=='webgpu'\n            use_native=native and args.backend!='compat'"),
-            ("          async with page.expect_download(timeout=45000) as dl:\n            await page.evaluate('window.__film.record({from:19.5,to:22.7})')", "          await page.evaluate('window.__film.record({from:19.5,to:22.7})')\n          await page.wait_for_function('window.__film.recorder.state===\"ready\" || window.__film.recorder.state===\"error\"',timeout=45000)\n          assert await page.evaluate('window.__film.recorder.state')=='ready',await page.locator('#recordProgress').inner_text()\n          # Subsequent automatic downloads may need another gesture in Chrome.\n          # Exercise the actual persistent download control, not browser bypass flags.\n          async with page.expect_download(timeout=15000) as dl:\n            await page.locator('#recordDownload').click()"),
-            ("          async with page.expect_download(timeout=30000) as dl:\n            await page.evaluate('window.__film.record({from:84.0})')", "          await page.evaluate('window.__film.record({from:84.0})')\n          await page.wait_for_function('window.__film.recorder.state===\"ready\" || window.__film.recorder.state===\"error\"',timeout=30000)\n          assert await page.evaluate('window.__film.recorder.state')=='ready',await page.locator('#recordProgress').inner_text()\n          async with page.expect_download(timeout=15000) as dl:\n            await page.locator('#recordDownload').click()"),
-            ("        finally:await browser.close()", "        except BaseException:\n          try:\n            report['failureState']=await page.evaluate('({film:window.__film?.state,recorder:window.__film?.recorder?.diagnostics,audio:window.__film?.soundtrack?.diagnostics,progress:document.querySelector(\"#recordProgress\")?.textContent,fatal:document.querySelector(\"#fatalText\")?.textContent})')\n            await page.screenshot(path=str(out/'failure.png'),timeout=5000)\n          except Exception:pass\n          raise\n        finally:await browser.close()")
-          ]
-          for old, new in replacements:
-              if new in s:
-                  continue
-              assert old in s, f'Reviewed test changed: {old[:80]}'
+          old = "  await paint(from,{force:true}); // Supply a complete initial frame before waiting for onstart.\n  await recorder.ready;\n  if(!await soundtrack.play(from))throw new Error('Recording playback was cancelled.');\n  running=true;started=true;ended=false;$('#gate').hidden=true;\n"
+          new = "  await paint(from,{force:true}); // Prime video before awaiting encoder readiness.\n  // Some Chrome encoders wait for input from EVERY track before firing onstart.\n  // Feed the soundtrack and rendering loop first; waiting for ready here would\n  // deadlock a second recording whose previous source has already been stopped.\n  if(!await soundtrack.play(from))throw new Error('Recording playback was cancelled.');\n  running=true;started=true;ended=false;$('#gate').hidden=true;\n  await recorder.ready;\n"
+          if new not in s:
+              assert old in s, 'Reviewed recording controller changed'
               s = s.replace(old, new, 1)
-          assert hashlib.sha256(s.encode()).hexdigest() == '2e9c57afe56575ecd01be4e4deae9a033f7515a866e2718254eb6174c68b7ae1', 'Unexpected reconstructed test contents'
+          p.write_text(s)
+          p = Path('docs/CHROME-RECORDING.md')
+          s = p.read_text().replace('Current renderer resolution is bounded', 'Recording output resolution is bounded')
+          if '## Input-ready ordering' not in s:
+              s += '\n## Input-ready ordering\n\nChrome can delay MediaRecorder\'s start event until every input track has supplied\nmedia. A repeated capture must start the soundtrack and the render loop before\nawaiting recorder.ready; otherwise a stopped previous source can starve the audio\ntrack and the preparation phase times out. The real macOS Chrome regression test\nreproduced this condition on a second capture with one video frame and zero bytes.\nBoth tracks are now primed before waiting for readiness, while startup remains\nbounded and failures pause playback and release recording resources.\n'
+          p.write_text(s)
+          p = Path('.github/workflows/pages.yml')
+          s = p.read_text()
+          old = 'if [ "$RUNNER_OS" = macOS ]; then FLAGS+=(--chrome); fi'
+          new = 'FLAGS+=(--chrome) # Exercise installed stable Chrome on both platforms.'
+          if new not in s:
+              assert old in s
+              s = s.replace(old, new, 1)
           p.write_text(s)
       - name: Set up Node.js
         uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
@@ -71,9 +73,9 @@ jobs:
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add tests/recording_browser.py Aether-Orb-Odyssey.html MANIFEST.json
+          git add src/app.js docs/CHROME-RECORDING.md .github/workflows/pages.yml Aether-Orb-Odyssey.html MANIFEST.json
           if git diff --cached --quiet; then exit 0; fi
-          git commit -m 'Test repeat-download gesture recovery and native GPU capture with failure diagnostics'
+          git commit -m 'Start both media inputs before awaiting encoder readiness; validate stable Chrome'
           git fetch origin main
           test "$(git rev-parse origin/main)" = "$EXPECTED_HEAD" || { echo 'main changed; refusing overwrite'; exit 1; }
           git push origin HEAD:main
