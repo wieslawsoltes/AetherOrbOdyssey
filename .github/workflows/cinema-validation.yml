@@ -1,0 +1,60 @@
+name: Cinematic renderer validation
+on:
+  push:
+    branches: [feat/cinematic-renderer]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: cinema-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  source:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          persist-credentials: false
+      - name: Archive exact source
+        run: git archive --format=zip HEAD -o "$RUNNER_TEMP/source.zip"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: cinema-source
+          path: ${{ runner.temp }}/source.zip
+          retention-days: 7
+  cinema:
+    runs-on: macos-14
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - run: npm test
+      - name: Cinematic GPU and performance verification
+        shell: bash
+        run: |
+          if [ ! -f tests/cinema_browser.py ]; then exit 0; fi
+          python3 -m venv "$RUNNER_TEMP/cinema-venv"
+          "$RUNNER_TEMP/cinema-venv/bin/python" -m pip install playwright==1.57.0
+          if ! command -v ffmpeg >/dev/null; then brew install ffmpeg; fi
+          if [ ! -x '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' ]; then
+            "$RUNNER_TEMP/cinema-venv/bin/python" -m playwright install chrome
+          fi
+          python3 tools/fetch_music.py
+          python3 tools/build_pages.py
+          "$RUNNER_TEMP/cinema-venv/bin/python" tests/cinema_browser.py --root _site --output "$RUNNER_TEMP/cinema-evidence" --chrome
+          "$RUNNER_TEMP/cinema-venv/bin/python" tests/recording_browser.py --root _site --output "$RUNNER_TEMP/recording-evidence" --backend webgpu --chrome
+      - name: Preserve native GPU evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: cinema-native-macos
+          path: |
+            ${{ runner.temp }}/cinema-evidence
+            ${{ runner.temp }}/recording-evidence
+          if-no-files-found: ignore
+          retention-days: 7
