@@ -46,19 +46,23 @@ async def run(args):
       async with async_playwright() as p:
         launch={'headless':True,'args':['--no-sandbox','--disable-dev-shm-usage']}
         if platform.system()=='Linux':
-            launch['args']+=['--use-angle=swiftshader','--enable-unsafe-swiftshader','--enable-unsafe-webgpu','--use-webgpu-adapter=swiftshader']
+            launch['args']+=['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader','--enable-unsafe-webgpu','--use-webgpu-adapter=swiftshader']
         if args.executable:launch['executable_path']=args.executable
         elif args.chrome:launch['channel']='chrome'
+        else:launch['channel']='chromium' # Full Chromium/new headless, not headless_shell.
         browser=await p.chromium.launch(**launch);report['browser']=browser.version
         report['browserProduct']='Google Chrome' if args.chrome else 'Chromium'
         page=await browser.new_page(viewport={'width':960,'height':540},accept_downloads=True)
         page.on('pageerror',lambda e:report['errors'].append(str(e)))
+        report['console']=[]
+        page.on('console',lambda m:report['console'].append(m.type+': '+m.text) if m.type in ('warning','error') else None)
         try:
           native=False
           if not args.inline:
-            await page.goto(origin+'/__capture_probe__')
-            native=await page.evaluate('async()=>!!(await navigator.gpu?.requestAdapter())')
-            if args.backend=='webgpu':assert native,'Native WebGPU adapter unavailable'
+            if args.backend=='auto':
+              await page.goto(origin+'/__capture_probe__')
+              native=await page.evaluate('async()=>!!(await navigator.gpu?.requestAdapter())')
+            else:native=args.backend=='webgpu'
             use_native=native and args.backend!='compat'
             await page.goto(origin+'/?quality=preview'+('' if use_native else '&compat=1'))
           else:
@@ -93,15 +97,23 @@ async def run(args):
           assert (out/'retry-download.webm').read_bytes()==path.read_bytes()
           report['checks'].append('Persistent explicit download is byte-identical and retryable')
           # The same production recording controller can capture a bounded scene.
-          async with page.expect_download(timeout=45000) as dl:
-            await page.evaluate('window.__film.record({from:19.5,to:22.7})')
+          await page.evaluate('window.__film.record({from:19.5,to:22.7})')
+          await page.wait_for_function('window.__film.recorder.state==="ready" || window.__film.recorder.state==="error"',timeout=45000)
+          assert await page.evaluate('window.__film.recorder.state')=='ready',await page.locator('#recordProgress').inner_text()
+          # Subsequent automatic downloads may need another gesture in Chrome.
+          # Exercise the actual persistent download control, not browser bypass flags.
+          async with page.expect_download(timeout=15000) as dl:
+            await page.locator('#recordDownload').click()
           download=await dl.value;path=out/('glass-'+download.suggested_filename);await download.save_as(path)
           analysis=inspect_video(path);assert analysis['maximumPixelChange']>0.05,analysis
           report['videos'].append(analysis);report['checks'].append('Second capture: actual glass shot has changing nonblack pixels and nonzero encoded music')
           if use_native:report['nativeWebGPUValidated']=True
           # Exercise the natural full-film end, including audio-ended/rAF ordering.
-          async with page.expect_download(timeout=30000) as dl:
-            await page.evaluate('window.__film.record({from:84.0})')
+          await page.evaluate('window.__film.record({from:84.0})')
+          await page.wait_for_function('window.__film.recorder.state==="ready" || window.__film.recorder.state==="error"',timeout=30000)
+          assert await page.evaluate('window.__film.recorder.state')=='ready',await page.locator('#recordProgress').inner_text()
+          async with page.expect_download(timeout=15000) as dl:
+            await page.locator('#recordDownload').click()
           download=await dl.value;await download.save_as(out/('ending-'+download.suggested_filename))
           assert await page.evaluate('window.__film.recorder.state')=='ready'
           assert not await page.evaluate('window.__film.state.recording')
@@ -116,6 +128,12 @@ async def run(args):
           assert not report['errors'],report['errors']
           report['shaderErrors']=await page.evaluate('window.__film.renderer.errors');assert not report['shaderErrors']
           report['status']='passed'
+        except BaseException:
+          try:
+            report['failureState']=await page.evaluate('({film:window.__film?.state,recorder:window.__film?.recorder?.diagnostics,audio:window.__film?.soundtrack?.diagnostics,progress:document.querySelector("#recordProgress")?.textContent,fatal:document.querySelector("#fatalText")?.textContent})')
+            await page.screenshot(path=str(out/'failure.png'),timeout=5000)
+          except Exception:pass
+          raise
         finally:await browser.close()
     except Exception as error:
         report['status']='failed';report['failure']=str(error);raise
