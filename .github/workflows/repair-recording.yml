@@ -20,52 +20,29 @@ jobs:
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
         with:
           ref: ${{ github.sha }}
-      - name: Apply hash-verified recording fix
-        shell: python
-        run: |
-          import hashlib, json, lzma, pathlib, subprocess
-          root = pathlib.Path.cwd()
-          paths = [root / 'docs/recording-repair' / f'{n:03}.bin' for n in range(1, 5)]
-          raw = b''.join(p.read_bytes() for p in paths)
-          assert hashlib.sha256(raw).hexdigest() == '4debe03a45390eec412025c34de49e5a03d51049f8582b6d48686877f8b25f88', 'Patch archive integrity failure'
-          patch = json.loads(lzma.decompress(raw))
-          allowed = {'src/app.js', 'src/export.js', 'src/renderer.js', 'index.html', 'style.css', 'tools/build_single.py', 'tests/recording.test.mjs', 'tests/recording_browser.py', 'docs/CHROME-RECORDING.md'}
-          assert set(patch) == allowed, 'Unexpected patch paths'
-          pending = {}
-          for name, delta in patch.items():
-              path = root / name
-              before = path.read_bytes() if path.exists() else b''
-              old_blob = hashlib.sha1(b'blob ' + str(len(before)).encode() + b'\0' + before).hexdigest()
-              target_hash = hashlib.sha256(before).hexdigest()
-              if target_hash == delta['sha256']:
-                  continue
-              if delta['oldBlob'] is None:
-                  assert not path.exists(), f'New file already exists: {name}'
-              else:
-                  assert old_blob == delta['oldBlob'], f'Source changed since review: {name}; refusing overwrite'
-              old = before.decode('utf-8')
-              parts = []
-              for p in delta['parts']:
-                  if isinstance(p, str):
-                      parts.append(p)
-                  else:
-                      assert len(p) == 2 and 0 <= p[0] <= p[1] <= len(old), f'Invalid delta: {name}'
-                      parts.append(old[p[0]:p[1]])
-              data = ''.join(parts).encode('utf-8')
-              assert hashlib.sha256(data).hexdigest() == delta['sha256'], f'Reconstructed source integrity failure: {name}'
-              pending[path] = data
-          for path, data in pending.items():
-              path.parent.mkdir(parents=True, exist_ok=True)
-              path.write_bytes(data)
-          print(f'Applied {len(pending)} verified source files.')
-      - name: Keep isolated audio checks compatible with versioned renderer modules
+      - name: Refine actual browser regression checks
         shell: python
         run: |
           from pathlib import Path
-          p = Path('tests/audio_browser.py')
-          text = p.read_text()
-          text = text.replace("'**/src/renderer.js'", "'**/src/renderer.js*'")
-          p.write_text(text)
+          import hashlib
+          p = Path('tests/recording_browser.py')
+          s = p.read_text()
+          replacements = [
+            ("launch['args']+=['--use-angle=swiftshader'", "launch['args']+=['--use-gl=angle','--use-angle=swiftshader'"),
+            ("elif args.chrome:launch['channel']='chrome'", "elif args.chrome:launch['channel']='chrome'\n        else:launch['channel']='chromium' # Full Chromium/new headless, not headless_shell."),
+            ("        page.on('pageerror',lambda e:report['errors'].append(str(e)))", "        page.on('pageerror',lambda e:report['errors'].append(str(e)))\n        report['console']=[]\n        page.on('console',lambda m:report['console'].append(m.type+': '+m.text) if m.type in ('warning','error') else None)"),
+            ("            await page.goto(origin+'/__capture_probe__')\n            native=await page.evaluate('async()=>!!(await navigator.gpu?.requestAdapter())')\n            if args.backend=='webgpu':assert native,'Native WebGPU adapter unavailable'\n            use_native=native and args.backend!='compat'", "            if args.backend=='auto':\n              await page.goto(origin+'/__capture_probe__')\n              native=await page.evaluate('async()=>!!(await navigator.gpu?.requestAdapter())')\n            else:native=args.backend=='webgpu'\n            use_native=native and args.backend!='compat'"),
+            ("          async with page.expect_download(timeout=45000) as dl:\n            await page.evaluate('window.__film.record({from:19.5,to:22.7})')", "          await page.evaluate('window.__film.record({from:19.5,to:22.7})')\n          await page.wait_for_function('window.__film.recorder.state===\"ready\" || window.__film.recorder.state===\"error\"',timeout=45000)\n          assert await page.evaluate('window.__film.recorder.state')=='ready',await page.locator('#recordProgress').inner_text()\n          # Subsequent automatic downloads may need another gesture in Chrome.\n          # Exercise the actual persistent download control, not browser bypass flags.\n          async with page.expect_download(timeout=15000) as dl:\n            await page.locator('#recordDownload').click()"),
+            ("          async with page.expect_download(timeout=30000) as dl:\n            await page.evaluate('window.__film.record({from:84.0})')", "          await page.evaluate('window.__film.record({from:84.0})')\n          await page.wait_for_function('window.__film.recorder.state===\"ready\" || window.__film.recorder.state===\"error\"',timeout=30000)\n          assert await page.evaluate('window.__film.recorder.state')=='ready',await page.locator('#recordProgress').inner_text()\n          async with page.expect_download(timeout=15000) as dl:\n            await page.locator('#recordDownload').click()"),
+            ("        finally:await browser.close()", "        except BaseException:\n          try:\n            report['failureState']=await page.evaluate('({film:window.__film?.state,recorder:window.__film?.recorder?.diagnostics,audio:window.__film?.soundtrack?.diagnostics,progress:document.querySelector(\"#recordProgress\")?.textContent,fatal:document.querySelector(\"#fatalText\")?.textContent})')\n            await page.screenshot(path=str(out/'failure.png'),timeout=5000)\n          except Exception:pass\n          raise\n        finally:await browser.close()")
+          ]
+          for old, new in replacements:
+              if new in s:
+                  continue
+              assert old in s, f'Reviewed test changed: {old[:80]}'
+              s = s.replace(old, new, 1)
+          assert hashlib.sha256(s.encode()).hexdigest() == '2e9c57afe56575ecd01be4e4deae9a033f7515a866e2718254eb6174c68b7ae1', 'Unexpected reconstructed test contents'
+          p.write_text(s)
       - name: Set up Node.js
         uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
         with:
@@ -94,9 +71,9 @@ jobs:
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add src/app.js src/export.js src/renderer.js index.html style.css tools/build_single.py tests/recording.test.mjs tests/recording_browser.py tests/audio_browser.py docs/CHROME-RECORDING.md Aether-Orb-Odyssey.html MANIFEST.json
+          git add tests/recording_browser.py Aether-Orb-Odyssey.html MANIFEST.json
           if git diff --cached --quiet; then exit 0; fi
-          git commit -m 'Keep isolated audio regression checks aligned with versioned renderer modules'
+          git commit -m 'Test repeat-download gesture recovery and native GPU capture with failure diagnostics'
           git fetch origin main
           test "$(git rev-parse origin/main)" = "$EXPECTED_HEAD" || { echo 'main changed; refusing overwrite'; exit 1; }
           git push origin HEAD:main
