@@ -37,13 +37,17 @@ jobs:
           if '## Input-ready ordering' not in s:
               s += '\n## Input-ready ordering\n\nChrome can delay MediaRecorder\'s start event until every input track has supplied\nmedia. A repeated capture must start the soundtrack and the render loop before\nawaiting recorder.ready; otherwise a stopped previous source can starve the audio\ntrack and the preparation phase times out. The real macOS Chrome regression test\nreproduced this condition on a second capture with one video frame and zero bytes.\nBoth tracks are now primed before waiting for readiness, while startup remains\nbounded and failures pause playback and release recording resources.\n'
           p.write_text(s)
-          p = Path('.github/workflows/pages.yml')
+          p = Path('tests/recording_browser.py')
           s = p.read_text()
-          old = 'if [ "$RUNNER_OS" = macOS ]; then FLAGS+=(--chrome); fi'
-          new = 'FLAGS+=(--chrome) # Exercise installed stable Chrome on both platforms.'
-          if new not in s:
+          replacements = [
+            ("else:launch['channel']='chromium' # Full Chromium/new headless, not headless_shell.", "else:launch['channel']='chrome' if shutil.which('google-chrome') else 'chromium' # Full browser, not headless_shell."),
+            ("report['browserProduct']='Google Chrome' if args.chrome else 'Chromium'", "report['browserProduct']='Google Chrome' if launch.get('channel')=='chrome' else 'Chromium'")
+          ]
+          for old,new in replacements:
+              if new in s:
+                  continue
               assert old in s
-              s = s.replace(old, new, 1)
+              s=s.replace(old,new,1)
           p.write_text(s)
       - name: Set up Node.js
         uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
@@ -73,7 +77,7 @@ jobs:
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add src/app.js docs/CHROME-RECORDING.md .github/workflows/pages.yml Aether-Orb-Odyssey.html MANIFEST.json
+          git add src/app.js docs/CHROME-RECORDING.md tests/recording_browser.py Aether-Orb-Odyssey.html MANIFEST.json
           if git diff --cached --quiet; then exit 0; fi
           git commit -m 'Start both media inputs before awaiting encoder readiness; validate stable Chrome'
           git fetch origin main
