@@ -30,3 +30,13 @@ Suggested video-description credit:
 All scene geometry, shaders, camera curves, typography layouts and UI in this rebuild were authored for the concept film. No movie footage, production CAD model, customer testimonial, market statistic or third-party commercial soundtrack master is included. Font files are not distributed; installed system fonts are used.
 
 The depicted glass enclosure, energy trails and separated assembly are design illustrations, not a claim that the physical device can display volumetric light in the shown manner. “Engineering concept” is the release label. This film does not establish manufacturing readiness, certification, shipping availability or tested product performance.
+
+
+## iPhone-compatible recording copy
+
+The published site additionally includes `assets/zarathustra.mp3`, encoded with FFmpeg
+from the same size/SHA-1-verified Kevin MacLeod Ogg recording identified above.
+Only the encoding/container, sample rate and playback volume change; the music is
+not replaced, synthesized or credited as a new performance. The original CC BY 3.0
+attribution and source apply to both copies. MP3 ID3 tags include the performer,
+composer and license URL. The original Ogg remains available as a fallback.

@@ -52,7 +52,7 @@
     <button id="chaptersButton" class="text-button" aria-controls="chapters" aria-expanded="false">Chapters <span>⌃</span></button>
    </div>
    <div class="controls-right">
-    <button id="sound" class="text-button" aria-pressed="true" title="Mute (M)"><span class="sound-bars" aria-hidden="true"><i></i><i></i><i></i><i></i></span><span id="soundLabel">Sound on</span></button>
+    <button id="sound" class="text-button" aria-pressed="false" title="Enable sound (M)"><span class="sound-bars" aria-hidden="true"><i></i><i></i><i></i><i></i></span><span id="soundLabel">Enable sound</span></button>
     <select id="quality" aria-label="Render quality"><option value="preview">Preview</option><option value="balanced" selected>Balanced</option><option value="cinema">Cinema</option><option value="ultra">Ultra / 4K</option></select>
     <button id="creditsButton" class="text-button">Credits</button>
     <button id="fullscreen" class="icon-button" aria-label="Enter fullscreen" title="Fullscreen (F)">⛶</button>
@@ -60,7 +60,7 @@
   </div>
  </footer>
  <nav id="chapters" aria-label="Film chapters" hidden></nav>
- <div id="audioError" class="audio-error" role="alert" hidden><strong>The orchestra is not loaded.</strong><p id="audioErrorText"></p><div><button id="retryAudio">Retry score</button><label class="file-button">Choose audio<input id="audioFile" type="file" accept="audio/*"></label><button id="silent">Watch silent</button></div></div>
+ <div id="audioError" class="audio-error" role="alert" hidden><strong>Sound needs your attention.</strong><p id="audioErrorText"></p><div><button id="retryAudio">Enable sound</button><label class="file-button">Choose audio<input id="audioFile" type="file" accept="audio/*"></label><button id="silent">Watch silent</button></div></div>
  <div id="fatal" class="fatal" role="alert" hidden><p class="eyebrow">RENDERER STATUS</p><h2>WebGPU needs your attention.</h2><p id="fatalText"></p><p>Serve the folder with <code>python3 tools/serve.py</code> and open <code>http://localhost:8080</code>. Use a browser with WebGPU and hardware acceleration enabled.</p><button onclick="location.reload()">Retry</button> <button onclick="const u=new URL(location.href);u.searchParams.set('compat','1');location.href=u">WebGL2 compatibility</button></div>
 </main>
 <dialog id="credits">
@@ -68,8 +68,10 @@
  <p class="eyebrow">FILM NOTES & CREDITS</p><h2>Aether Orb<br>Odyssey.</h2>
  <p>A real-time concept film. All geometry, light, glass, atmosphere, particles and camera motion are rendered live. The exploded assembly is a design visualization, not a verified production assembly.</p>
  <h3>Music</h3><p><em>Also Sprach Zarathustra — Einleitung</em><br>Composition: Richard Strauss.<br>Recording: Kevin MacLeod.</p>
- <p>Used under <a href="https://creativecommons.org/licenses/by/3.0/" target="_blank" rel="noopener noreferrer">Creative Commons Attribution 3.0</a>. <a href="https://commons.wikimedia.org/wiki/File:Also_Sprach_Zarathustra_-_Einleitung.ogg" target="_blank" rel="noopener noreferrer">Recording and source</a>. Synchronized to the animation; playback volume adjusted. This is not the film soundtrack master and no endorsement is implied.</p>
+ <p>Used under <a href="https://creativecommons.org/licenses/by/3.0/" target="_blank" rel="noopener noreferrer">Creative Commons Attribution 3.0</a>. <a href="https://commons.wikimedia.org/wiki/File:Also_Sprach_Zarathustra_-_Einleitung.ogg" target="_blank" rel="noopener noreferrer">Recording and source</a>. Synchronized to the animation; playback volume adjusted. An MP3 compatibility copy is transcoded from the credited Ogg recording. This is not the film soundtrack master and no endorsement is implied.</p>
  <p class="muted">The score loads from the local assets folder when present, otherwise from Wikimedia Commons, and is cached when the browser allows it. Locally selected replacement audio is never uploaded. The source and license above apply to the default recording only; update credits and obtain any necessary rights for replacement audio.</p>
+ <h3>Sound check</h3><p>Tap play below to test the recording through the native media player. This pauses the film. Check media volume and your Bluetooth or AirPlay output. Older iOS versions without playback-session support may also require Silent Mode to be off for the film.</p>
+ <audio id="testSound" controls preload="none" src="./assets/zarathustra.mp3" style="width:100%" aria-label="Test the orchestral recording"></audio>
  <h3>Local capture</h3><p>Record the film with titles and sound in your browser. Export uses your current render resolution and codec support; it runs in real time.</p>
  <button id="recordFilm" class="primary-small">Record film</button><span id="recordStatus" role="status"></span>
  <p class="muted">Space: play/pause · ← / →: seek · R: replay · M: mute · F: fullscreen · C: credits.</p>
@@ -350,7 +352,7 @@ class CompatibilityRenderer extends EventTarget {
 }
 
 // -------- audio.js --------
-/** The licensed orchestral recording is the clock. There is no oscillator imitation. */
+/** The licensed recording is the clock. Playback is explicitly user-initiated. */
 const MUSIC = Object.freeze({
  title:'Also Sprach Zarathustra — Einleitung',
  composer:'Richard Strauss',performer:'Kevin MacLeod',license:'CC BY 3.0',
@@ -359,16 +361,57 @@ const MUSIC = Object.freeze({
  licenseUrl:'https://creativecommons.org/licenses/by/3.0/',
  sha1:'ab5a1863b4fead3069445bdbcfd0f62ecfd09481'
 });
+
+function audioDeadline(promise, milliseconds, message) {
+ let timer;
+ return Promise.race([promise,new Promise((_,reject)=>{
+  timer=setTimeout(()=>reject(new Error(message)),milliseconds);
+ })]).finally(()=>clearTimeout(timer));
+}
+
 class Soundtrack extends EventTarget {
- constructor(){super();this.offset=0;this.startedAt=0;this.playing=false;this.volume=.75;this.muted=false;this.silent=false;this.energy=[];this.energyHz=30;}
+ constructor({resumeTimeout=5000}={}){
+  super();this.offset=0;this.startedAt=0;this.playing=false;this.volume=.75;
+  this.muted=false;this.silent=false;this.energy=[];this.energyHz=30;
+  this.resumeTimeout=resumeTimeout;this.playRequest=0;this.lastError=null;
+  this.source=null;this.loadedUrl=null;this.loadErrors=[];this.disposed=false;
+ }
+ status(message){this.dispatchEvent(new CustomEvent('status',{detail:message}));}
  async unlock() {
-  if(!this.context){
-   this.context=new AudioContext({latencyHint:'playback'});
+  if(this.disposed)throw new Error('The audio player has been disposed. Reload the page.');
+  // Do this BEFORE constructing/resuming the context, in the original click stack.
+  // AudioContext's default session is ambient, which iOS may silence with the ringer.
+  try{if(globalThis.navigator?.audioSession)navigator.audioSession.type='playback';}catch{}
+  if(!this.context||this.context.state==='closed'){
+   const Context=globalThis.AudioContext||globalThis.webkitAudioContext;
+   if(!Context)throw new Error('This browser has no Web Audio support. Open the film in Safari.');
+   this.context=new Context({latencyHint:'playback'});
    this.gain=this.context.createGain();this.gain.gain.value=this.muted?0:this.volume;
    this.gain.connect(this.context.destination);
    this.destination=this.context.createMediaStreamDestination();this.gain.connect(this.destination);
+   this.context.addEventListener('statechange',()=>{
+    if(this.playing&&!this.silent&&this.context.state!=='running'){
+     this.pause();this.dispatchEvent(new CustomEvent('interruption',{detail:this.context.state}));
+    }
+    this.dispatchEvent(new Event('change'));
+   });
   }
-  if(this.context.state==='suspended')await this.context.resume();
+  const context=this.context;
+  if(context.state!=='running'){
+   // resume() AND source.start() must execute before any await/network/animation work.
+   // Handle WebKit's "interrupted" state as well as the standard "suspended" state.
+   const resumed=context.resume();
+   const prime=context.createBufferSource();prime.buffer=context.createBuffer(1,1,context.sampleRate);
+   prime.connect(context.destination);prime.onended=()=>prime.disconnect();prime.start(0);
+   try{
+    await audioDeadline(resumed,this.resumeTimeout,'Audio is paused by the browser. Tap “Enable sound” to resume.');
+   }catch(error){this.lastError=error.message;throw error;}
+  }
+  if(context.state!=='running'){
+   this.lastError=`Audio is ${context.state}. Tap “Enable sound” after returning to the film.`;
+   throw new Error(this.lastError);
+  }
+  this.lastError=null;this.dispatchEvent(new Event('change'));
  }
  async load() {
   if(this.buffer)return;
@@ -376,29 +419,35 @@ class Soundtrack extends EventTarget {
   this.loading=this._load().finally(()=>this.loading=null);return this.loading;
  }
  async _load() {
-  await this.unlock();
-  const urls=['./assets/zarathustra.ogg',MUSIC.url];let last;
+  await this.unlock();this.loadErrors=[];
+  // MP3 is built from the same verified recording. Do not require Ogg on older iOS.
+  const urls=['./assets/zarathustra.mp3','./assets/zarathustra.ogg',MUSIC.url];
   for(const url of urls){
-   try {
-    this.dispatchEvent(new CustomEvent('status',{detail:url.startsWith('.')?'Checking local score…':'Loading Strauss orchestral recording…'}));
+   const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),25000);
+   try{
+    this.status(`Loading orchestra (${url.endsWith('.mp3')?'MP3':'Ogg'})…`);
     let response;
-    if('caches'in window){try{response=await caches.match(url);}catch{}}
-    if(!response){
-     response=await fetch(url,{signal:AbortSignal.timeout(url.startsWith('.')?2500:22000),mode:'cors'});
-     if(!response.ok)throw new Error(`HTTP ${response.status}`);
-     if('caches'in window&&url===MUSIC.url){try{const cache=await caches.open('aether-odyssey-music-v1');await cache.put(url,response.clone());}catch{}}
-    }
+    if(globalThis.caches){try{response=await caches.match(url);}catch{}}
+    if(!response){response=await fetch(url,{signal:controller.signal,mode:'cors'});}
+    if(!response.ok)throw new Error(`HTTP ${response.status}`);
     const raw=await response.arrayBuffer();
     if(raw.byteLength<10000)throw new Error('The audio response is incomplete.');
-    this.buffer=await this.context.decodeAudioData(raw);
-    this.buildEnvelope();this.dispatchEvent(new CustomEvent('status',{detail:'Strauss · Kevin MacLeod · recording ready'}));return;
-   } catch(e){last=e;}
+    const buffer=await this.context.decodeAudioData(raw);
+    if(!Number.isFinite(buffer.duration)||buffer.duration<=0)throw new Error('The recording has no playable audio.');
+    this.buffer=buffer;this.loadedUrl=url;this.buildEnvelope();this.lastError=null;
+    this.status('Strauss · Kevin MacLeod · recording ready');this.dispatchEvent(new Event('change'));return;
+   }catch(error){this.loadErrors.push(`${url}: ${error.message}`);}
+   finally{clearTimeout(timer);}
   }
-  throw new Error(`The orchestral recording could not be loaded. ${last?.message||''} Use “Choose audio” to open the licensed recording locally, or explicitly choose the silent preview.`);
+  this.lastError='The orchestra could not be decoded or downloaded. Tap “Enable sound” to retry, or choose an audio file. '+this.loadErrors.join(' | ');
+  throw new Error(this.lastError);
  }
  async importFile(file){
-  await this.unlock();this.pause();this.buffer=await this.context.decodeAudioData(await file.arrayBuffer());this.silent=false;this.offset=0;this.imported=true;this.importedName=file.name;this.buildEnvelope();
-  this.dispatchEvent(new CustomEvent('status',{detail:`Local audio: ${file.name}`}));
+  await this.unlock();this.pause();const data=await file.arrayBuffer();
+  const buffer=await this.context.decodeAudioData(data);
+  this.buffer=buffer;this.silent=false;this.offset=0;this.imported=true;this.importedName=file.name;
+  this.loadedUrl='Local file';this.lastError=null;this.buildEnvelope();
+  this.status(`Local audio: ${file.name}`);this.dispatchEvent(new Event('change'));
  }
  buildEnvelope(){
   const b=this.buffer;if(!b)return;const data=b.getChannelData(0);const stride=Math.max(1,Math.floor(b.sampleRate/this.energyHz));this.energy=new Float32Array(Math.ceil(data.length/stride));let peak=0;
@@ -406,19 +455,35 @@ class Soundtrack extends EventTarget {
   if(peak>0)for(let i=0;i<this.energy.length;i++)this.energy[i]/=peak;
  }
  energyAt(t){return this.energy[Math.max(0,Math.min(this.energy.length-1,Math.floor(t*this.energyHz)))]||0;}
- get time(){if(!this.playing)return this.offset;return this.offset+Math.max(0,(this.context?this.context.currentTime:performance.now()/1000)-this.startedAt);}
+ get clock(){return this.silent?performance.now()/1000:(this.context?.currentTime||0);}
+ get time(){return this.playing?this.offset+Math.max(0,this.clock-this.startedAt):this.offset;}
  async play(offset=this.offset){
-  await this.unlock();this.stopSource();this.offset=Math.max(0,offset);this.startedAt=this.context.currentTime;
-  if(this.buffer&&!this.silent&&offset<this.buffer.duration){
-   const src=this.context.createBufferSource();src.buffer=this.buffer;src.connect(this.gain);src.start(this.startedAt,offset);this.source=src;
+  if(!Number.isFinite(offset))throw new TypeError('Playback offset must be finite.');
+  this.pause();const request=++this.playRequest;
+  if(!this.silent){
+   if(!this.buffer)throw new Error('The orchestra is not loaded. Tap “Enable sound”.');
+   await this.unlock();
   }
-  this.playing=true;
+  if(request!==this.playRequest)return false; // Pause/visibility change won the race.
+  this.offset=Math.max(0,offset);this.startedAt=this.clock;
+  if(!this.silent){
+   if(this.offset>=this.buffer.duration)throw new Error('This recording has ended. Replay or choose a longer recording.');
+   const source=this.context.createBufferSource();source.buffer=this.buffer;source.connect(this.gain);
+   source.onended=()=>{
+    if(this.source!==source)return;
+    this.offset=this.buffer.duration;this.playing=false;source.disconnect();this.source=null;
+    this.dispatchEvent(new Event('ended'));this.dispatchEvent(new Event('change'));
+   };
+   source.start(this.startedAt,this.offset);this.source=source;
+  }
+  this.playing=true;this.lastError=null;this.dispatchEvent(new Event('change'));return true;
  }
- pause(){this.offset=this.time;this.playing=false;this.stopSource();}
- stopSource(){if(this.source){try{this.source.stop();}catch{}this.source.disconnect();this.source=null;}}
- async seek(t){const playing=this.playing;this.pause();this.offset=Math.max(0,t);if(playing)await this.play(this.offset);}
- setMuted(muted){this.muted=muted;if(this.gain)this.gain.gain.setTargetAtTime(muted?0:this.volume,this.context.currentTime,.02);}
- dispose(){this.pause();this.context?.close();}
+ pause(){this.offset=this.time;this.playing=false;++this.playRequest;this.stopSource();this.dispatchEvent(new Event('change'));}
+ stopSource(){if(this.source){const source=this.source;this.source=null;source.onended=null;try{source.stop();}catch{}source.disconnect();}}
+ async seek(t){const playing=this.playing;this.pause();this.offset=Math.max(0,t);if(playing)return this.play(this.offset);}
+ setMuted(muted){this.muted=Boolean(muted);if(this.gain){this.gain.gain.cancelScheduledValues(this.context.currentTime);this.gain.gain.setTargetAtTime(this.muted?0:this.volume,this.context.currentTime,.02);}this.dispatchEvent(new Event('change'));}
+ get diagnostics(){return {contextState:this.context?.state||'not created',sessionType:globalThis.navigator?.audioSession?.type||'unsupported',source:this.loadedUrl,playing:this.playing,muted:this.muted,silent:this.silent,lastError:this.lastError,loadErrors:this.loadErrors};}
+ dispose(){this.pause();this.disposed=true;return this.context?.close();}
 }
 
 // -------- export.js --------
@@ -477,7 +542,7 @@ const renderer=new RendererType(world,{quality:initialQuality});
 const soundtrack=new Soundtrack();
 const recorder=new LocalFilmRecorder(renderer,soundtrack);
 let running=false,started=false,ended=false,manualTime=0,busy=false,pendingFrame=null,lastTitle=null,hideTimer,recording=false;
-let scrubWasRunning=false,creditsWasRunning=false;
+let scrubWasRunning=false,creditsWasRunning=false,startRequest=0;
 const format=t=>`${String(Math.floor(t/60)).padStart(2,'0')}:${String(Math.floor(t%60)).padStart(2,'0')}`;
 const timeNow=()=>running?Math.min(soundtrack.time,DURATION):manualTime;
 
@@ -522,34 +587,74 @@ async function paint(time,{force=false,poster=false}={}){
  if(pendingFrame&&!force){const next=pendingFrame;pendingFrame=null;queueMicrotask(()=>paint(next.time,{poster:next.poster}));}
 }
 function fatal(error){running=false;soundtrack.pause();document.body.classList.remove('playing');$('#fatal').hidden=false;$('#fatalText').textContent=error?.message||String(error);$('#loadStatus').textContent='Renderer unavailable';console.error(error);}
-function audioError(error){$('#audioErrorText').textContent=error.message;$('#audioError').hidden=false;$('#start').disabled=false;$('#startLabel').textContent='Watch the film';}
+function updateSoundControl(){
+ const available=!!soundtrack.buffer&&!soundtrack.silent;
+ const blocked=soundtrack.context&&soundtrack.context.state!=='running';
+ const enabled=available&&!soundtrack.muted&&!blocked;
+ $('#soundLabel').textContent=soundtrack.silent?'Enable sound':soundtrack.muted?'Muted':blocked?'Resume sound':available?'Sound on':'Enable sound';
+ $('#sound').setAttribute('aria-pressed',String(enabled));
+ $('#sound').title=enabled?'Mute (M)':'Enable or resume sound (M)';
+ document.body.classList.toggle('muted',!enabled);
+}
+function audioError(error){
+ if(error?.name==='AbortError')return;
+ pause();$('#audioErrorText').textContent=error.message||String(error);$('#audioError').hidden=false;
+ $('#start').disabled=false;$('#startLabel').textContent='Watch the film';
+ updateSoundControl();revealControls();
+}
 async function start({silent=false,from=0,skipLoad=false}={}){
  if(!renderer.ready)return;
- $('#start').disabled=true;$('#audioError').hidden=true;
- try {
-  await soundtrack.unlock();
+ const request=++startRequest;
+ // unlock runs synchronously in the tap handler before the first await.
+ const activation=silent?Promise.resolve():soundtrack.unlock();
+ pause();$('#start').disabled=true;$('#audioError').hidden=true;
+ try{
+  await activation;
   if(!silent&&!skipLoad)await soundtrack.load();
-  soundtrack.silent=silent;started=true;ended=false;manualTime=clamp(from,0,DURATION);
-  $('#gate').hidden=true;$('#start').disabled=false;$('#filmType').hidden=false;
-  await soundtrack.play(manualTime);running=true;document.body.classList.add('playing');revealControls();
+  if(request!==startRequest||document.hidden)return;
+  soundtrack.silent=silent;
+  manualTime=clamp(from,0,DURATION);
+  const playing=await soundtrack.play(manualTime);
+  if(request!==startRequest||document.hidden){soundtrack.pause();return;}
+  if(!playing)return;
+  started=true;ended=false;running=true;
+  $('#gate').hidden=true;$('#filmType').hidden=false;
+  document.body.classList.add('playing');revealControls();updateSoundControl();
   $('#loadStatus').textContent=silent?'Silent preview':'Orchestra ready';
- }catch(e){audioError(e);}
+ }catch(error){if(request===startRequest)audioError(error);}
+ finally{if(request===startRequest){$('#start').disabled=false;$('#startLabel').textContent='Watch the film';}}
 }
 function pause(){
- if(!running)return;manualTime=clamp(soundtrack.time,0,DURATION);soundtrack.pause();running=false;
+ if(running)manualTime=clamp(soundtrack.time,0,DURATION);
+ soundtrack.pause();running=false;
  document.body.classList.remove('playing','idle');transport(manualTime);
 }
 async function toggle(){
- if(running){pause();return;}
+ if(running){++startRequest;pause();return;}
  if(!started||ended){await start({silent:soundtrack.silent,from:0});return;}
  if(!soundtrack.buffer&&!soundtrack.silent){await start({from:manualTime});return;}
- await soundtrack.play(manualTime);running=true;document.body.classList.add('playing');revealControls();
+ try{
+  if(await soundtrack.play(manualTime)){running=true;document.body.classList.add('playing');revealControls();}
+ }catch(error){audioError(error);}
 }
 async function seek(time,{resume=false}={}){
+ // Preserve the trusted gesture even when painting the seek frame is asynchronous.
+ const activation=resume&&!soundtrack.silent?soundtrack.unlock():Promise.resolve();
  pause();started=true;ended=false;$('#gate').hidden=true;manualTime=clamp(time,0,DURATION);soundtrack.offset=manualTime;
- await paint(manualTime,{force:true});
- if(resume&&!soundtrack.buffer&&!soundtrack.silent){await start({from:manualTime});return;}
- if(resume){await soundtrack.play(manualTime);running=true;document.body.classList.add('playing');revealControls();}
+ try{
+  await activation;await paint(manualTime,{force:true});
+  if(resume&&!soundtrack.buffer&&!soundtrack.silent){await start({from:manualTime});return;}
+  if(resume&&await soundtrack.play(manualTime)){running=true;document.body.classList.add('playing');revealControls();}
+ }catch(error){audioError(error);}
+}
+async function enableSound(){
+ if(!soundtrack.buffer||soundtrack.silent||soundtrack.context?.state!=='running'){
+  soundtrack.setMuted(false);await start({from:ended?0:timeNow()});return;
+ }
+ try{
+  const activation=soundtrack.muted?soundtrack.unlock():Promise.resolve();
+  soundtrack.setMuted(!soundtrack.muted);await activation;updateSoundControl();
+ }catch(error){audioError(error);}
 }
 async function tick(){
  try {
@@ -566,11 +671,11 @@ async function tick(){
 }
 async function fullscreen(){try{if(document.fullscreenElement)await document.exitFullscreen();else await stage.requestFullscreen();}catch(e){$('#loadStatus').textContent=e.message;}}
 function updateDiagnostics(){
- $('#diagnostics').textContent=JSON.stringify({renderer:renderer.backend||'Native WebGPU / WGSL',resolution:`${renderer.width} × ${renderer.height}`,quality:renderer.quality,completedFrames:renderer.frames,submissionAndCompletionMs:Math.round(renderer.gpuMs*10)/10,shaderErrors:renderer.errors,adapter:renderer.adapterInfo,music:soundtrack.buffer?`${soundtrack.buffer.duration.toFixed(2)} s / ${soundtrack.buffer.sampleRate} Hz`:'Not yet loaded',recording:recording},null,2);
+ $('#diagnostics').textContent=JSON.stringify({renderer:renderer.backend||'Native WebGPU / WGSL',resolution:`${renderer.width} × ${renderer.height}`,quality:renderer.quality,completedFrames:renderer.frames,submissionAndCompletionMs:Math.round(renderer.gpuMs*10)/10,shaderErrors:renderer.errors,adapter:renderer.adapterInfo,music:soundtrack.buffer?`${soundtrack.buffer.duration.toFixed(2)} s / ${soundtrack.buffer.sampleRate} Hz`:'Not yet loaded',audio:soundtrack.diagnostics,recording:recording},null,2);
 }
 $('#start').addEventListener('click',()=>start());$('#playPause').addEventListener('click',toggle);
 $('#restart').addEventListener('click',()=>start({silent:soundtrack.silent}));
-$('#sound').addEventListener('click',()=>{soundtrack.setMuted(!soundtrack.muted);document.body.classList.toggle('muted',soundtrack.muted);$('#soundLabel').textContent=soundtrack.muted?'Muted':'Sound on';$('#sound').setAttribute('aria-pressed',String(!soundtrack.muted));});
+$('#sound').addEventListener('click',enableSound);
 $('#fullscreen').addEventListener('click',fullscreen);
 $('#quality').value=renderer.quality;
 $('#quality').addEventListener('change',async()=>{if(recording)return;await renderer.device.queue.onSubmittedWorkDone();renderer.setQuality($('#quality').value);await paint(started?(ended?84.7:timeNow()):82.0,{force:true,poster:!started});});
@@ -585,8 +690,8 @@ $('#scrub').addEventListener('input',()=>{started=true;$('#gate').hidden=true;en
 $('#scrub').addEventListener('change',()=>{const resume=scrubWasRunning;scrubWasRunning=false;seek(Number($('#scrub').value),{resume});});
 $('#creditsButton').addEventListener('click',()=>{creditsWasRunning=running;pause();updateDiagnostics();$('#credits').showModal();});
 $('#credits').addEventListener('close',()=>{if(creditsWasRunning&&!recording){creditsWasRunning=false;toggle();}});
-$('#retryAudio').addEventListener('click',()=>start());
-$('#silent').addEventListener('click',()=>start({silent:true}));
+$('#retryAudio').addEventListener('click',()=>{soundtrack.setMuted(false);start({from:ended?0:timeNow()});});
+$('#silent').addEventListener('click',()=>start({silent:true,from:ended?0:timeNow()}));
 $('#audioFile').addEventListener('change',async e=>{const file=e.target.files?.[0];if(!file)return;try{await soundtrack.importFile(file);await start({skipLoad:true});}catch(error){audioError(error);}});
 $('#recordFilm').addEventListener('click',async()=>{
  if(recording)return;
@@ -597,6 +702,11 @@ $('#recordFilm').addEventListener('click',async()=>{
  }catch(e){$('#recordStatus').textContent=e.message;}
 });
 soundtrack.addEventListener('status',e=>$('#loadStatus').textContent=e.detail);
+soundtrack.addEventListener('change',updateSoundControl);
+soundtrack.addEventListener('interruption',()=>audioError(new Error('Audio was interrupted by iOS or another app. Tap “Enable sound” to continue from this scene.')));
+soundtrack.addEventListener('ended',()=>{pause();if(manualTime<DURATION-.25)audioError(new Error('The selected recording has ended. Replay or choose a longer recording.'));});
+$('#testSound').addEventListener('play',()=>{pause();});
+$('#credits').addEventListener('close',()=>$('#testSound').pause());
 renderer.addEventListener('lost',e=>fatal(e.detail));renderer.addEventListener('error',e=>fatal(e.detail));
 window.addEventListener('pointermove',revealControls,{passive:true});window.addEventListener('pointerdown',revealControls,{passive:true});
 window.addEventListener('keydown',async e=>{
@@ -605,7 +715,7 @@ window.addEventListener('keydown',async e=>{
  switch(e.code){case'Space':await toggle();break;case'ArrowLeft':await seek(timeNow()-5,{resume:running});break;case'ArrowRight':await seek(timeNow()+5,{resume:running});break;case'KeyR':await start({silent:soundtrack.silent});break;case'KeyM':$('#sound').click();break;case'KeyF':await fullscreen();break;case'KeyC':$('#creditsButton').click();break;}
  revealControls();
 });
-document.addEventListener('visibilitychange',()=>{if(document.hidden)pause();});
+document.addEventListener('visibilitychange',()=>{if(document.hidden){++startRequest;pause();$('#start').disabled=false;}updateSoundControl();});
 let resizeTimer;window.addEventListener('resize',()=>{clearTimeout(resizeTimer);resizeTimer=setTimeout(async()=>{if(!renderer.ready||recording)return;await renderer.device.queue.onSubmittedWorkDone();renderer.resize();if(!running)await paint(started?(ended?84.7:manualTime):82,{poster:!started});},120);});
 
 const ready=(async()=>{
@@ -619,6 +729,7 @@ const ready=(async()=>{
   requestAnimationFrame(tick);return true;
  }catch(e){fatal(e);return false;}
 })();
+updateSoundControl();
 // Public deterministic capture interface. It deliberately does not auto-play sound.
 window.__film={
  ready,renderer,soundtrack,get state(){return {running,started,ended,time:timeNow(),errors:renderer.errors};},

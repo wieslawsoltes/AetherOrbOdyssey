@@ -1,6 +1,6 @@
 import {FilmRenderer} from './renderer.js';
 import {CompatibilityRenderer} from './compatibility.js';
-import {Soundtrack,MUSIC} from './audio.js';
+import {Soundtrack,MUSIC} from './audio.js?v=ios-audio-2';
 import {LocalFilmRecorder} from './export.js';
 import {sampleFilm,SHOTS,DURATION,ease,clamp} from './director.js';
 
@@ -12,7 +12,7 @@ const renderer=new RendererType(world,{quality:initialQuality});
 const soundtrack=new Soundtrack();
 const recorder=new LocalFilmRecorder(renderer,soundtrack);
 let running=false,started=false,ended=false,manualTime=0,busy=false,pendingFrame=null,lastTitle=null,hideTimer,recording=false;
-let scrubWasRunning=false,creditsWasRunning=false;
+let scrubWasRunning=false,creditsWasRunning=false,startRequest=0;
 const format=t=>`${String(Math.floor(t/60)).padStart(2,'0')}:${String(Math.floor(t%60)).padStart(2,'0')}`;
 const timeNow=()=>running?Math.min(soundtrack.time,DURATION):manualTime;
 
@@ -57,34 +57,74 @@ async function paint(time,{force=false,poster=false}={}){
  if(pendingFrame&&!force){const next=pendingFrame;pendingFrame=null;queueMicrotask(()=>paint(next.time,{poster:next.poster}));}
 }
 function fatal(error){running=false;soundtrack.pause();document.body.classList.remove('playing');$('#fatal').hidden=false;$('#fatalText').textContent=error?.message||String(error);$('#loadStatus').textContent='Renderer unavailable';console.error(error);}
-function audioError(error){$('#audioErrorText').textContent=error.message;$('#audioError').hidden=false;$('#start').disabled=false;$('#startLabel').textContent='Watch the film';}
+function updateSoundControl(){
+ const available=!!soundtrack.buffer&&!soundtrack.silent;
+ const blocked=soundtrack.context&&soundtrack.context.state!=='running';
+ const enabled=available&&!soundtrack.muted&&!blocked;
+ $('#soundLabel').textContent=soundtrack.silent?'Enable sound':soundtrack.muted?'Muted':blocked?'Resume sound':available?'Sound on':'Enable sound';
+ $('#sound').setAttribute('aria-pressed',String(enabled));
+ $('#sound').title=enabled?'Mute (M)':'Enable or resume sound (M)';
+ document.body.classList.toggle('muted',!enabled);
+}
+function audioError(error){
+ if(error?.name==='AbortError')return;
+ pause();$('#audioErrorText').textContent=error.message||String(error);$('#audioError').hidden=false;
+ $('#start').disabled=false;$('#startLabel').textContent='Watch the film';
+ updateSoundControl();revealControls();
+}
 async function start({silent=false,from=0,skipLoad=false}={}){
  if(!renderer.ready)return;
- $('#start').disabled=true;$('#audioError').hidden=true;
- try {
-  await soundtrack.unlock();
+ const request=++startRequest;
+ // unlock runs synchronously in the tap handler before the first await.
+ const activation=silent?Promise.resolve():soundtrack.unlock();
+ pause();$('#start').disabled=true;$('#audioError').hidden=true;
+ try{
+  await activation;
   if(!silent&&!skipLoad)await soundtrack.load();
-  soundtrack.silent=silent;started=true;ended=false;manualTime=clamp(from,0,DURATION);
-  $('#gate').hidden=true;$('#start').disabled=false;$('#filmType').hidden=false;
-  await soundtrack.play(manualTime);running=true;document.body.classList.add('playing');revealControls();
+  if(request!==startRequest||document.hidden)return;
+  soundtrack.silent=silent;
+  manualTime=clamp(from,0,DURATION);
+  const playing=await soundtrack.play(manualTime);
+  if(request!==startRequest||document.hidden){soundtrack.pause();return;}
+  if(!playing)return;
+  started=true;ended=false;running=true;
+  $('#gate').hidden=true;$('#filmType').hidden=false;
+  document.body.classList.add('playing');revealControls();updateSoundControl();
   $('#loadStatus').textContent=silent?'Silent preview':'Orchestra ready';
- }catch(e){audioError(e);}
+ }catch(error){if(request===startRequest)audioError(error);}
+ finally{if(request===startRequest){$('#start').disabled=false;$('#startLabel').textContent='Watch the film';}}
 }
 function pause(){
- if(!running)return;manualTime=clamp(soundtrack.time,0,DURATION);soundtrack.pause();running=false;
+ if(running)manualTime=clamp(soundtrack.time,0,DURATION);
+ soundtrack.pause();running=false;
  document.body.classList.remove('playing','idle');transport(manualTime);
 }
 async function toggle(){
- if(running){pause();return;}
+ if(running){++startRequest;pause();return;}
  if(!started||ended){await start({silent:soundtrack.silent,from:0});return;}
  if(!soundtrack.buffer&&!soundtrack.silent){await start({from:manualTime});return;}
- await soundtrack.play(manualTime);running=true;document.body.classList.add('playing');revealControls();
+ try{
+  if(await soundtrack.play(manualTime)){running=true;document.body.classList.add('playing');revealControls();}
+ }catch(error){audioError(error);}
 }
 async function seek(time,{resume=false}={}){
+ // Preserve the trusted gesture even when painting the seek frame is asynchronous.
+ const activation=resume&&!soundtrack.silent?soundtrack.unlock():Promise.resolve();
  pause();started=true;ended=false;$('#gate').hidden=true;manualTime=clamp(time,0,DURATION);soundtrack.offset=manualTime;
- await paint(manualTime,{force:true});
- if(resume&&!soundtrack.buffer&&!soundtrack.silent){await start({from:manualTime});return;}
- if(resume){await soundtrack.play(manualTime);running=true;document.body.classList.add('playing');revealControls();}
+ try{
+  await activation;await paint(manualTime,{force:true});
+  if(resume&&!soundtrack.buffer&&!soundtrack.silent){await start({from:manualTime});return;}
+  if(resume&&await soundtrack.play(manualTime)){running=true;document.body.classList.add('playing');revealControls();}
+ }catch(error){audioError(error);}
+}
+async function enableSound(){
+ if(!soundtrack.buffer||soundtrack.silent||soundtrack.context?.state!=='running'){
+  soundtrack.setMuted(false);await start({from:ended?0:timeNow()});return;
+ }
+ try{
+  const activation=soundtrack.muted?soundtrack.unlock():Promise.resolve();
+  soundtrack.setMuted(!soundtrack.muted);await activation;updateSoundControl();
+ }catch(error){audioError(error);}
 }
 async function tick(){
  try {
@@ -101,11 +141,11 @@ async function tick(){
 }
 async function fullscreen(){try{if(document.fullscreenElement)await document.exitFullscreen();else await stage.requestFullscreen();}catch(e){$('#loadStatus').textContent=e.message;}}
 function updateDiagnostics(){
- $('#diagnostics').textContent=JSON.stringify({renderer:renderer.backend||'Native WebGPU / WGSL',resolution:`${renderer.width} × ${renderer.height}`,quality:renderer.quality,completedFrames:renderer.frames,submissionAndCompletionMs:Math.round(renderer.gpuMs*10)/10,shaderErrors:renderer.errors,adapter:renderer.adapterInfo,music:soundtrack.buffer?`${soundtrack.buffer.duration.toFixed(2)} s / ${soundtrack.buffer.sampleRate} Hz`:'Not yet loaded',recording:recording},null,2);
+ $('#diagnostics').textContent=JSON.stringify({renderer:renderer.backend||'Native WebGPU / WGSL',resolution:`${renderer.width} × ${renderer.height}`,quality:renderer.quality,completedFrames:renderer.frames,submissionAndCompletionMs:Math.round(renderer.gpuMs*10)/10,shaderErrors:renderer.errors,adapter:renderer.adapterInfo,music:soundtrack.buffer?`${soundtrack.buffer.duration.toFixed(2)} s / ${soundtrack.buffer.sampleRate} Hz`:'Not yet loaded',audio:soundtrack.diagnostics,recording:recording},null,2);
 }
 $('#start').addEventListener('click',()=>start());$('#playPause').addEventListener('click',toggle);
 $('#restart').addEventListener('click',()=>start({silent:soundtrack.silent}));
-$('#sound').addEventListener('click',()=>{soundtrack.setMuted(!soundtrack.muted);document.body.classList.toggle('muted',soundtrack.muted);$('#soundLabel').textContent=soundtrack.muted?'Muted':'Sound on';$('#sound').setAttribute('aria-pressed',String(!soundtrack.muted));});
+$('#sound').addEventListener('click',enableSound);
 $('#fullscreen').addEventListener('click',fullscreen);
 $('#quality').value=renderer.quality;
 $('#quality').addEventListener('change',async()=>{if(recording)return;await renderer.device.queue.onSubmittedWorkDone();renderer.setQuality($('#quality').value);await paint(started?(ended?84.7:timeNow()):82.0,{force:true,poster:!started});});
@@ -120,8 +160,8 @@ $('#scrub').addEventListener('input',()=>{started=true;$('#gate').hidden=true;en
 $('#scrub').addEventListener('change',()=>{const resume=scrubWasRunning;scrubWasRunning=false;seek(Number($('#scrub').value),{resume});});
 $('#creditsButton').addEventListener('click',()=>{creditsWasRunning=running;pause();updateDiagnostics();$('#credits').showModal();});
 $('#credits').addEventListener('close',()=>{if(creditsWasRunning&&!recording){creditsWasRunning=false;toggle();}});
-$('#retryAudio').addEventListener('click',()=>start());
-$('#silent').addEventListener('click',()=>start({silent:true}));
+$('#retryAudio').addEventListener('click',()=>{soundtrack.setMuted(false);start({from:ended?0:timeNow()});});
+$('#silent').addEventListener('click',()=>start({silent:true,from:ended?0:timeNow()}));
 $('#audioFile').addEventListener('change',async e=>{const file=e.target.files?.[0];if(!file)return;try{await soundtrack.importFile(file);await start({skipLoad:true});}catch(error){audioError(error);}});
 $('#recordFilm').addEventListener('click',async()=>{
  if(recording)return;
@@ -132,6 +172,11 @@ $('#recordFilm').addEventListener('click',async()=>{
  }catch(e){$('#recordStatus').textContent=e.message;}
 });
 soundtrack.addEventListener('status',e=>$('#loadStatus').textContent=e.detail);
+soundtrack.addEventListener('change',updateSoundControl);
+soundtrack.addEventListener('interruption',()=>audioError(new Error('Audio was interrupted by iOS or another app. Tap “Enable sound” to continue from this scene.')));
+soundtrack.addEventListener('ended',()=>{pause();if(manualTime<DURATION-.25)audioError(new Error('The selected recording has ended. Replay or choose a longer recording.'));});
+$('#testSound').addEventListener('play',()=>{pause();});
+$('#credits').addEventListener('close',()=>$('#testSound').pause());
 renderer.addEventListener('lost',e=>fatal(e.detail));renderer.addEventListener('error',e=>fatal(e.detail));
 window.addEventListener('pointermove',revealControls,{passive:true});window.addEventListener('pointerdown',revealControls,{passive:true});
 window.addEventListener('keydown',async e=>{
@@ -140,7 +185,7 @@ window.addEventListener('keydown',async e=>{
  switch(e.code){case'Space':await toggle();break;case'ArrowLeft':await seek(timeNow()-5,{resume:running});break;case'ArrowRight':await seek(timeNow()+5,{resume:running});break;case'KeyR':await start({silent:soundtrack.silent});break;case'KeyM':$('#sound').click();break;case'KeyF':await fullscreen();break;case'KeyC':$('#creditsButton').click();break;}
  revealControls();
 });
-document.addEventListener('visibilitychange',()=>{if(document.hidden)pause();});
+document.addEventListener('visibilitychange',()=>{if(document.hidden){++startRequest;pause();$('#start').disabled=false;}updateSoundControl();});
 let resizeTimer;window.addEventListener('resize',()=>{clearTimeout(resizeTimer);resizeTimer=setTimeout(async()=>{if(!renderer.ready||recording)return;await renderer.device.queue.onSubmittedWorkDone();renderer.resize();if(!running)await paint(started?(ended?84.7:manualTime):82,{poster:!started});},120);});
 
 const ready=(async()=>{
@@ -154,6 +199,7 @@ const ready=(async()=>{
   requestAnimationFrame(tick);return true;
  }catch(e){fatal(e);return false;}
 })();
+updateSoundControl();
 // Public deterministic capture interface. It deliberately does not auto-play sound.
 window.__film={
  ready,renderer,soundtrack,get state(){return {running,started,ended,time:timeNow(),errors:renderer.errors};},

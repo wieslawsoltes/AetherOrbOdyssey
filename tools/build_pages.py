@@ -8,6 +8,7 @@ from pathlib import Path
 import shutil
 import subprocess
 from fetch_music import SHA1, SIZE
+from encode_music import encode_mp3
 
 ROOT = Path(__file__).resolve().parents[1]
 FILES = ('index.html', 'style.css', 'Aether-Orb-Odyssey.html', 'NOTICE.md')
@@ -45,6 +46,7 @@ def stage(output: Path, *, allow_missing_music: bool = False, source: Path = ROO
     (output / 'assets').mkdir()
     if music_present:
         shutil.copy2(music, output / 'assets' / music.name)
+        encode_mp3(music, output / 'assets' / 'zarathustra.mp3')
     if commit is None:
         result = subprocess.run(['git', 'rev-parse', 'HEAD'], cwd=source, text=True,
                                 capture_output=True, check=False)
@@ -56,7 +58,7 @@ def stage(output: Path, *, allow_missing_music: bool = False, source: Path = ROO
             contents[path.relative_to(output).as_posix()] = {
                 'bytes': len(data), 'sha256': hashlib.sha256(data).hexdigest()}
     manifest = {'schema': 1, 'project': 'AetherOrbOdyssey', 'commit': commit,
-                'musicBundled': music_present, 'files': contents}
+                'musicBundled': music_present, 'musicFormats': ['mp3', 'ogg'] if music_present else [], 'files': contents}
     (output / 'deployment.json').write_text(json.dumps(manifest, indent=2) + '\n', encoding='utf-8')
     return manifest
 
@@ -67,7 +69,7 @@ def main() -> int:
     args = parser.parse_args()
     try:
         manifest = stage(ROOT / '_site', allow_missing_music=args.allow_missing_music)
-    except (OSError, ValueError) as exc:
+    except (OSError, ValueError, subprocess.SubprocessError) as exc:
         parser.exit(1, f'Pages build failed: {exc}\n')
     print(f"Staged {len(manifest['files'])} files; musicBundled={manifest['musicBundled']}; commit={manifest['commit']}")
     return 0

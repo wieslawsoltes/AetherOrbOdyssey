@@ -41,7 +41,7 @@ def verify(base: str, commit: str, *, allow_missing_music: bool = False) -> int:
     required = {'index.html', 'style.css', 'src/app.js', 'shaders/scene.wgsl',
                 'shaders/particles.wgsl', 'Aether-Orb-Odyssey.html', 'NOTICE.md'}
     if not allow_missing_music:
-        required.add('assets/zarathustra.ogg')
+        required.update({'assets/zarathustra.ogg', 'assets/zarathustra.mp3', 'src/audio.js'})
     if not required.issubset(files):
         raise ValueError('Published site is missing required runtime files.')
     for name, expected in sorted(files.items()):

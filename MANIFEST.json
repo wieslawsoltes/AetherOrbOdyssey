@@ -12,8 +12,12 @@
     "sha256": "b762ce4bf69c488ffda590f33d3553e29cbb03a16fbe530165e1f10b3a8a52be"
   },
   ".github/workflows/pages.yml": {
-    "bytes": 2992,
-    "sha256": "c725a50f4a0bc7b367ce7733c7d0fcc4be95d1019b3a70288d296ff532796312"
+    "bytes": 4326,
+    "sha256": "872c37113e8315cf8a15ace451c4a4c003138d168645f89fbb856b7c7550ca73"
+  },
+  ".github/workflows/repair-iphone-audio.yml": {
+    "bytes": 4430,
+    "sha256": "e2e1581a9bb133db3cc6b58efd7986b07a65a52e469db5032154f83995f03dd8"
   },
   ".gitignore": {
     "bytes": 110,
@@ -24,12 +28,12 @@
     "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
   },
   "Aether-Orb-Odyssey.html": {
-    "bytes": 97220,
-    "sha256": "48f9cdab5a3020a6944b5ce6c3e356c56630d10dda1f04306d5955e59cdb82a3"
+    "bytes": 103781,
+    "sha256": "81a59aade33db3f6fe4d806ad4b9017b24d252a90f6b88e2f28f20ba851ba049"
   },
   "NOTICE.md": {
-    "bytes": 2972,
-    "sha256": "5e6bc78dcabcebe2e1168ed8453127f02a4543069ac717f874e4984aefc3b37b"
+    "bytes": 3500,
+    "sha256": "b9afcca8c352ebc93a8e8613b414f0f021eec70ff21b2fb5db653514df191825"
   },
   "QA.md": {
     "bytes": 3658,
@@ -51,6 +55,10 @@
     "bytes": 1101,
     "sha256": "2304b3d1cb437897d4e5f507c526c1c9eb1014a26f3d0b146b7cae42ccb256c4"
   },
+  "docs/IPHONE-AUDIO.md": {
+    "bytes": 3745,
+    "sha256": "a5b7956cb4fd8e6478855cf522798c5b910d084ff8163e50f64b43f2fc190d0f"
+  },
   "docs/PUBLICATION-QA.md": {
     "bytes": 3042,
     "sha256": "eca7b947b9a712a911f5f395b1425c48b3a29345ad248ad09f25c2ba1ee0ff53"
@@ -59,13 +67,29 @@
     "bytes": 5791,
     "sha256": "e5449087d7c5a744832ba4a31c255815270e45a4b4860acc3fa928153e7b3552"
   },
+  "docs/iphone-audio-patch/00.bin": {
+    "bytes": 5500,
+    "sha256": "edad5a6cf77914b084ee038657f14707a67c0eb436836693bfeff65d1f8cab92"
+  },
+  "docs/iphone-audio-patch/01.bin": {
+    "bytes": 5500,
+    "sha256": "839c6c02ab5e5f66f7d4c07a180f287bf06d01fba9229c7a5ae72e534d02f7c8"
+  },
+  "docs/iphone-audio-patch/02.bin": {
+    "bytes": 5500,
+    "sha256": "7f9d8ef178527361ac74c58a54f93a5974cb5e04464760fafb8642a997bed481"
+  },
+  "docs/iphone-audio-patch/03.bin": {
+    "bytes": 4604,
+    "sha256": "c7ab087cac510cad0df1c4d143d0c10d6e2c40c1e8244edfed320fa6c67accfd"
+  },
   "docs/source-baseline.tar.xz": {
     "bytes": 55616,
     "sha256": "7c25e8156b0ed5a4d5095cb8609be183431d410b3b09ff16f3a200f157291c22"
   },
   "index.html": {
-    "bytes": 6534,
-    "sha256": "8423ffcde56857564f3c55bcfd71b9afed1750ce3ca48da84a0f181c4997d38c"
+    "bytes": 7065,
+    "sha256": "b17c0902efeadfe5c1919e134bfcf90e7caef7309bbfd9ea1a9d55f62c8613d1"
   },
   "package.json": {
     "bytes": 555,
@@ -136,12 +160,12 @@
     "sha256": "2be75b7e81a2894387f020783f770e882fdd19679d62c843aedd4353e646cdaf"
   },
   "src/app.js": {
-    "bytes": 12492,
-    "sha256": "cc079d2ad80544b90fc1b4fed2c4c33c4706a519546623eb5bbc849eb0b45ef0"
+    "bytes": 14827,
+    "sha256": "b5467d65790bfc66be9fc86bb39b43bdb6ada1418b5a35e3671396d51048007c"
   },
   "src/audio.js": {
-    "bytes": 4572,
-    "sha256": "09ad16773243beb1466deedb8f30b20b54c5dab04d145072ab88decc0f7a5e7e"
+    "bytes": 8295,
+    "sha256": "f40710484a451298e6a56d850bd74d36c7a4738383effd9f18be14ac4ab9ff33"
   },
   "src/compatibility.js": {
     "bytes": 11519,
@@ -163,6 +187,14 @@
     "bytes": 12501,
     "sha256": "cd8c826773384b1670f3c3d897b6e4fffa27690b3705b0dc9bd1fef2b4ecfa22"
   },
+  "tests/audio.test.mjs": {
+    "bytes": 7203,
+    "sha256": "10c9597719dfb50b29b94283fd7e8d7d0ce90c80d3a6c402e7319e5bb4a137a0"
+  },
+  "tests/audio_browser.py": {
+    "bytes": 9817,
+    "sha256": "16bbcf062d0bd52d4606784f9b1b69c7861a15b39e5462e6eba19a6ef886093e"
+  },
   "tests/browser-results.json": {
     "bytes": 776,
     "sha256": "d9b09496a041b673a1844a3703f3c08912cfbe385cb8d2bafc07fbb1fd4ece21"
@@ -175,6 +207,10 @@
     "bytes": 1396,
     "sha256": "0e210205154b6827f70547e9d9f978b60a6687856cd87aa7267604aec9bd09eb"
   },
+  "tests/test_encode_music.py": {
+    "bytes": 2435,
+    "sha256": "bf7102f27a129acab51b119574ebe114eab8f19a3086999662d267119c90bf18"
+  },
   "tests/test_pages.py": {
     "bytes": 5063,
     "sha256": "6067f59a0b19c27034d35eb02b06a2bfddf5eb5800658c1dec96f17256e8ca61"
@@ -184,16 +220,20 @@
     "sha256": "8273d7c093717654ed37ede9337f0ddade5c03b9ba2e1fec9384451f0525b55b"
   },
   "tools/build_pages.py": {
-    "bytes": 3372,
-    "sha256": "1c7117164e8b59b2b51d22914f842667fec0befb51f81426b98a664f6ca6a740"
+    "bytes": 3558,
+    "sha256": "e8139221bafae76e23e5600bfba9e9e3deba251243cc93ee1aa0efdd36636ffc"
   },
   "tools/build_single.py": {
-    "bytes": 1618,
-    "sha256": "d0750b3cda674c00cd3faec841b884d3ecd0d0d03cda7a5b0b608193bce2e9e9"
+    "bytes": 1640,
+    "sha256": "b3709bcefb0ac993ab88438d462cdbc7ebaa18c2cf7681b723a7dee6af698b9b"
   },
   "tools/capture.py": {
     "bytes": 4868,
     "sha256": "03c68d40ba980174106dd6c5174cd0f7bf1a17dbb69aa510349d9d116ba2fdb6"
+  },
+  "tools/encode_music.py": {
+    "bytes": 2642,
+    "sha256": "45a88dade0431f2932d6463a75ff4d6d610bb9ee68a72a13a5cc59b0edb1575e"
   },
   "tools/fetch_music.py": {
     "bytes": 2505,
@@ -216,7 +256,7 @@
     "sha256": "fcbc573a01a2645616decdd8f6557f7447b2104edd87b671d5b46238d2b22e9f"
   },
   "tools/verify_site.py": {
-    "bytes": 3740,
-    "sha256": "3bea3d4fc899ee3800d6038ff3ce8d570e4ec7ecd349b20fbaf4f075b9460571"
+    "bytes": 3787,
+    "sha256": "e617f0228a8c16551e523331acd79b2625ae47f86224afca01ba7f070651d984"
   }
 }
