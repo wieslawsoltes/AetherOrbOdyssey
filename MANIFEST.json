@@ -11,6 +11,10 @@
     "bytes": 8793,
     "sha256": "b762ce4bf69c488ffda590f33d3553e29cbb03a16fbe530165e1f10b3a8a52be"
   },
+  ".github/workflows/pages.yml": {
+    "bytes": 2992,
+    "sha256": "c725a50f4a0bc7b367ce7733c7d0fcc4be95d1019b3a70288d296ff532796312"
+  },
   ".gitignore": {
     "bytes": 110,
     "sha256": "49a097ae206fd5178cf73e51778ba3e271936b938464c35cec18e170a7b5cfcb"
@@ -32,8 +36,8 @@
     "sha256": "d6562f6c71c215a040a5bc59e2e598e9df4e564a129a95ca7594b91001121963"
   },
   "README.md": {
-    "bytes": 9433,
-    "sha256": "2adec51ff71932d0ed39bd632b7904ff0bc7823efadf8c2931a91bd7289c30fe"
+    "bytes": 10577,
+    "sha256": "88f3f6119fc12c5ce5a9a9fe3d502cb8a2e3c0127dac11ab2af10decbb6db79a"
   },
   "assets/README.md": {
     "bytes": 305,

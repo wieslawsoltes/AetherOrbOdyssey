@@ -4,9 +4,10 @@ A rebuilt 86.06-second HTML / JavaScript / WebGPU concept film for **CrystalBall
 
 ## GitHub Pages publication
 
-Repository target: **[wieslawsoltes/AetherOrbOdyssey](https://github.com/wieslawsoltes/AetherOrbOdyssey)**.
-After a successful workflow deployment, the default site address is
-**https://wieslawsoltes.github.io/AetherOrbOdyssey/**.
+[Watch on GitHub Pages](https://wieslawsoltes.github.io/AetherOrbOdyssey/) · [Deployment status](https://github.com/wieslawsoltes/AetherOrbOdyssey/actions/workflows/pages.yml)
+
+Source: **[wieslawsoltes/AetherOrbOdyssey](https://github.com/wieslawsoltes/AetherOrbOdyssey)**.
+Every successful `main` deployment publishes the exact commit and verified runtime asset hashes in `deployment.json`.
 
 The source package includes a complete GitHub Pages workflow, source-integrity verification,
 same-origin soundtrack packaging and a safe local publication helper:
@@ -17,8 +18,8 @@ bash tools/publish-github.sh
 
 This command requires an authenticated local GitHub CLI, Git, Python 3.10+ and Node.js 20+.
 It validates, pushes without force, configures Pages, watches the deployment and verifies the
-published revision. The prepared distribution has not itself been pushed or published from
-this chat session. See [the publication guide](docs/PUBLISHING.md) for prerequisites and checks.
+published revision. The source has been imported through the connected GitHub account; the workflow is the
+authoritative deployment status. See [the publication guide](docs/PUBLISHING.md) for prerequisites and checks.
 
 The workflow downloads the credited recording into the published Pages artifact. The source
 ZIP still does not contain its bytes. Missing or unverified music fails production publication.
@@ -26,13 +27,13 @@ ZIP still does not contain its bytes. Missing or unverified music fails producti
 ## Watch
 
 ```sh
-cd aether-orb-odyssey
+cd AetherOrbOdyssey
 python3 tools/serve.py --fetch-music
 ```
 
 Open **http://localhost:8080**, then press **Watch the film**. Python is only the static development server. There is no backend application, API key, account, JavaScript dependency installation or build step required for playback.
 
-`--fetch-music` downloads the credited recording once, verifies its documented SHA-1 and size, and places it in `assets/zarathustra.ogg`. Without that option the browser first checks for the local file, then downloads the same recording from Wikimedia Commons on the first explicit play. A network connection is required for that first download; subsequent local playback is offline. This delivered archive does **not** contain the recording bytes. The build environment could verify the source page but could not retrieve the binary audio.
+`--fetch-music` downloads the credited recording once, verifies its documented SHA-1 and size, and places it in `assets/zarathustra.ogg`. Without that option the browser first checks for the local file, then downloads the same recording from Wikimedia Commons on the first explicit play. A network connection is required for that first download; subsequent local playback is offline. The source repository does **not** contain the recording bytes. The Pages build downloads, verifies and bundles the recording in the public site, so visitors do not depend on a cross-origin music request.
 
 **Aether-Orb-Odyssey.html** is also a single-file edition: all first-party JavaScript, CSS, WGSL and compatibility GLSL are embedded. Its music is still loaded separately. Use the local server for the most predictable WebGPU behavior. Native WebGPU requires a supporting browser, an available adapter, and a secure context. The app never identifies its compatibility renderer as WebGPU.
 
@@ -141,3 +142,9 @@ python3 tools/build_single.py
 ```
 
 No font files, copyrighted movie frames, commercial soundtrack master, analytics or tracking are included.
+
+## Import and verification provenance
+
+All 42 original text files were transferred with SHA-256 verification. The exact textual baseline is retained in `docs/source-baseline.tar.xz`; subsequent publication edits are separate Git commits. Preview PNGs and the contact sheet were recaptured in GitHub Actions rather than transferred as the original image bytes. This repository uses a new import history, not the earlier local history bundle.
+
+See [import provenance](docs/IMPORT-PROVENANCE.md), [current browser results](tests/browser-results.json), and the [Actions runs](https://github.com/wieslawsoltes/AetherOrbOdyssey/actions). The original `QA.md` and `docs/PUBLICATION-QA.md` describe earlier local validation, not the status of the live deployment. Browser regression checks use the labelled WebGL2 compatibility renderer; they do not claim native WebGPU or physical-device performance validation.
