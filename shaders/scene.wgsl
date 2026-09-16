@@ -206,10 +206,10 @@ fn holography(ro:vec3f,rd:vec3f,sceneDepth:f32)->vec3f{
    let distance=dot(center-ro,normal)/denom;
    if(distance>0.0 && distance<sceneDepth){
     let p=ro+rd*distance-center;let radius=length(p);let angle=atan2(p.z,p.x);
-    let target=1.40+k*.35;let footprint=max(.004,distance*u.camera.w/u.resolution.y*1.4);
-    let ring=exp(-pow((radius-target)/footprint,2.0));
+    let ringRadius=1.40+k*.35;let footprint=max(.004,distance*u.camera.w/u.resolution.y*1.4);
+    let ring=exp(-pow((radius-ringRadius)/footprint,2.0));
     let dash=smoothstep(.05,.22,sin(angle*(22.0+k*9.0)+u.resolution.z*(.24-k*.43)));
-    let ticks=pow(max(0.0,cos(angle*64.0)),28.0)*(1.0-smoothstep(.016,.043,abs(radius-target+.05)));
+    let ticks=pow(max(0.0,cos(angle*64.0)),28.0)*(1.0-smoothstep(.016,.043,abs(radius-ringRadius+.05)));
     let breathing=.65+.35*sin(u.resolution.z*.65+k);
     light+=mix(vec3f(.055,.35,.78),vec3f(.40,.23,.08),k*.5)*(ring*dash+ticks*.55)*strength*breathing;
    }
