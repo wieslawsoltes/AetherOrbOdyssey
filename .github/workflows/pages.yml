@@ -98,12 +98,16 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-latest
-            backend: webgpu
-            name: native-webgpu
+          # Native WebGPU is required on the reported platform, not silently replaced.
           - os: macos-14
-            backend: auto
-            name: macos-chrome
+            backend: webgpu
+            name: macos-chrome-native-webgpu
+          # Exercise the separate production compatibility capture path as well.
+          # Linux SwiftShader native initialization is an unresolved, documented
+          # limitation (run 35133451644), not a native-WebGPU validation pass.
+          - os: ubuntu-latest
+            backend: compat
+            name: linux-chrome-webgl2
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
     steps:
