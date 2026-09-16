@@ -20,66 +20,79 @@ jobs:
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
         with:
           ref: ${{ github.sha }}
-      - name: Fix encoder input-ready ordering
+      - name: Enforce requested backend and document actual validation scope
         shell: python
         run: |
           from pathlib import Path
-          p = Path('src/app.js')
+          p = Path('tests/recording_browser.py')
           s = p.read_text()
-          old = "  await paint(from,{force:true}); // Supply a complete initial frame before waiting for onstart.\n  await recorder.ready;\n  if(!await soundtrack.play(from))throw new Error('Recording playback was cancelled.');\n  running=true;started=true;ended=false;$('#gate').hidden=true;\n"
-          new = "  await paint(from,{force:true}); // Prime video before awaiting encoder readiness.\n  // Some Chrome encoders wait for input from EVERY track before firing onstart.\n  // Feed the soundtrack and rendering loop first; waiting for ready here would\n  // deadlock a second recording whose previous source has already been stopped.\n  if(!await soundtrack.play(from))throw new Error('Recording playback was cancelled.');\n  running=true;started=true;ended=false;$('#gate').hidden=true;\n  await recorder.ready;\n"
+          old = "          report['backend']=await page.locator('#backend').inner_text()\n"
+          new = old + "          if args.backend=='webgpu':assert report['backend']=='NATIVE WEBGPU','Native WebGPU is required; compatibility fallback is not a pass'\n          if args.backend=='compat':assert report['backend']=='WEBGL2 COMPATIBILITY','Explicit compatibility capture was not selected'\n"
           if new not in s:
-              assert old in s, 'Reviewed recording controller changed'
+              assert old in s, 'Reviewed browser check changed'
               s = s.replace(old, new, 1)
           p.write_text(s)
           p = Path('docs/CHROME-RECORDING.md')
-          s = p.read_text().replace('Current renderer resolution is bounded', 'Recording output resolution is bounded')
-          if '## Input-ready ordering' not in s:
-              s += '\n## Input-ready ordering\n\nChrome can delay MediaRecorder\'s start event until every input track has supplied\nmedia. A repeated capture must start the soundtrack and the render loop before\nawaiting recorder.ready; otherwise a stopped previous source can starve the audio\ntrack and the preparation phase times out. The real macOS Chrome regression test\nreproduced this condition on a second capture with one video frame and zero bytes.\nBoth tracks are now primed before waiting for readiness, while startup remains\nbounded and failures pause playback and release recording resources.\n'
-          p.write_text(s)
-          p = Path('tests/recording_browser.py')
           s = p.read_text()
-          replacements = [
-            ("else:launch['channel']='chromium' # Full Chromium/new headless, not headless_shell.", "else:launch['channel']='chrome' if shutil.which('google-chrome') else 'chromium' # Full browser, not headless_shell."),
-            ("report['browserProduct']='Google Chrome' if args.chrome else 'Chromium'", "report['browserProduct']='Google Chrome' if launch.get('channel')=='chrome' else 'Chromium'")
-          ]
-          for old,new in replacements:
-              if new in s:
-                  continue
-              assert old in s
-              s=s.replace(old,new,1)
+          if '## Executed macOS recording validation' not in s:
+              s += '''
+          ## Executed macOS recording validation
+
+          GitHub Actions run 35133451644, macOS job 104920305061, passed all
+          recording browser checks with Google Chrome 152.0.7977.65 on macOS
+          14.8.9 ARM64 and the actual NATIVE WEBGPU renderer. Tests recorded real
+          film scenes and the credited MP3, then decoded VP8 video and Opus audio.
+          Checks covered the Record film UI, pause/resume, Stop & save, a byte-identical
+          manual re-download, a second glass-scene recording with changing nonblack
+          pixels and nonzero encoded music, natural end finalization, and visible
+          recovery from an injected asynchronous encoder error. These were 960x540
+          capture tests on a hosted Mac, not a full-duration 1080p performance test
+          or a test on the user's own Mac. The source gate also passed 35 JavaScript
+          and 13 Python tests, plus real-audio Chromium and WebKit checks.
+
+          Evidence: https://github.com/wieslawsoltes/AetherOrbOdyssey/actions/runs/35133451644/job/104920305061
+
+          The separate Linux SwiftShader native-WebGPU job in that run failed
+          during renderer initialization, before any recording or audio began:
+          "A valid external Instance reference no longer exists." This reproduced
+          with both Chromium 143 and installed Google Chrome 152. It remains an
+          unresolved Linux native-rendering/driver compatibility limitation; no
+          Linux native-WebGPU recording success is claimed. The mandatory release
+          matrix now explicitly requires native WebGPU on macOS Chrome and
+          independently exercises the WebGL2 compatibility capture path on Linux.
+          A backend assertion prevents silently passing native tests with fallback.
+          Neither job suppresses test failures. Both must pass before deployment.
+          '''
           p.write_text(s)
       - name: Set up Node.js
         uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
         with:
           node-version: '24'
           package-manager-cache: false
-      - name: Ensure audio encoder for existing regression tests
+      - name: Ensure encoder for regression tests
         run: |
           if ! command -v ffmpeg >/dev/null || ! command -v ffprobe >/dev/null; then
             sudo apt-get update && sudo apt-get install -y ffmpeg
           fi
-      - name: Run source regression tests
+      - name: Test source and regenerate standalone edition
         run: |
           npm test
           python3 -m unittest discover -s tests -p 'test_*.py' -v
           for file in src/*.js; do node --check "$file"; done
           python3 -m compileall -q tools tests
-      - name: Regenerate standalone edition and complete source inventory
-        run: |
           python3 tools/build_compat.py
           python3 tools/build_single.py
           python3 tools/manifest.py write
           python3 tools/manifest.py check
-      - name: Commit verified repair without rewriting remote history
+      - name: Commit source-only validation update
         env:
           EXPECTED_HEAD: ${{ github.sha }}
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add src/app.js docs/CHROME-RECORDING.md tests/recording_browser.py Aether-Orb-Odyssey.html MANIFEST.json
+          git add tests/recording_browser.py docs/CHROME-RECORDING.md Aether-Orb-Odyssey.html MANIFEST.json
           if git diff --cached --quiet; then exit 0; fi
-          git commit -m 'Start both media inputs before awaiting encoder readiness; validate stable Chrome'
+          git commit -m 'Require exact capture backends and document verified macOS recording results'
           git fetch origin main
           test "$(git rev-parse origin/main)" = "$EXPECTED_HEAD" || { echo 'main changed; refusing overwrite'; exit 1; }
           git push origin HEAD:main
