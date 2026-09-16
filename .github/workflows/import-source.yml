@@ -1,0 +1,170 @@
+name: Import complete Odyssey source
+
+on:
+  push:
+    branches: [main]
+    paths: [.github/workflows/import-source.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: odyssey-initial-import
+  cancel-in-progress: false
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out destination
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - name: Restore hash-verified original source
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 - <<'PY'
+          import base64, hashlib, io, json, os, tarfile, urllib.request
+          from pathlib import Path, PurePosixPath
+          if Path('src/app.js').exists():
+              raise SystemExit('Source is already imported; refusing to overwrite it.')
+          shas = [
+              '248c9d37bfd36f8ae8b8fbcee138669ee51dd05c',
+              '12d3cc3790ae8bd4d6a0d58f5ef16b8c8f6ceb6d',
+              '2ca780e541e39693543a03b53bd778a3e99bed7a',
+              'aede26fda7e0a1cb94e0fb64c0f9a5edd02c6d2e',
+              'e0c14670634e06cf351b3ea184048842476a64b9',
+              'e91c3072ab1bab328052e58385dbf9f0905b505a',
+              'd4b5cf3766f4db590d1e30c0e6612071e1c28389',
+              'c63532bf1071b7e33ddbe6857082130761049358',
+              '84b1decfb87385fee70cbb2162a90842262bfd75',
+              '9541fe557d234a232c325d40b64f5c00ea7c1c92',
+          ]
+          parts = []
+          for sha in shas:
+              url = f'https://api.github.com/repos/{os.environ["GITHUB_REPOSITORY"]}/git/blobs/{sha}'
+              req = urllib.request.Request(url, headers={
+                  'Authorization': 'Bearer ' + os.environ['GH_TOKEN'],
+                  'Accept': 'application/vnd.github+json',
+                  'User-Agent': 'AetherOrbOdyssey-source-import',
+              })
+              with urllib.request.urlopen(req, timeout=60) as response:
+                  blob = json.load(response)
+              data = base64.b64decode(blob['content'])
+              actual = hashlib.sha1(b'blob ' + str(len(data)).encode() + b'\0' + data).hexdigest()
+              if actual != sha:
+                  raise SystemExit('Git blob integrity failure: ' + sha)
+              parts.append(data)
+          archive = b''.join(parts)
+          digest = hashlib.sha256(archive).hexdigest()
+          if len(archive) != 55616 or digest != '7c25e8156b0ed5a4d5095cb8609be183431d410b3b09ff16f3a200f157291c22':
+              raise SystemExit('Source archive integrity failure')
+          with tarfile.open(fileobj=io.BytesIO(archive), mode='r:xz') as tar:
+              members = tar.getmembers()
+              if len(members) != 42 or sum(m.size for m in members) > 2_000_000:
+                  raise SystemExit('Unexpected source archive structure')
+              files = {}
+              for member in members:
+                  p = PurePosixPath(member.name)
+                  if not member.isfile() or p.is_absolute() or '..' in p.parts or '.git' in p.parts:
+                      raise SystemExit('Unsafe archive path: ' + member.name)
+                  data = tar.extractfile(member).read()
+                  data.decode('utf-8')
+                  files[member.name] = data
+          manifest = json.loads(files['MANIFEST.json'])
+          for name, data in files.items():
+              if name != 'MANIFEST.json':
+                  expected = manifest[name]
+                  if len(data) != expected['bytes'] or hashlib.sha256(data).hexdigest() != expected['sha256']:
+                      raise SystemExit('Original source hash mismatch: ' + name)
+              # Install workflow through the connected account in the next commit.
+              # GITHUB_TOKEN is deliberately not used to write workflow files.
+              if name == '.github/workflows/pages.yml':
+                  continue
+              path = Path(name)
+              if path.exists() and path.read_bytes() != data:
+                  raise SystemExit('Refusing to overwrite destination file: ' + name)
+              path.parent.mkdir(parents=True, exist_ok=True)
+              path.write_bytes(data)
+          Path('docs/source-baseline.tar.xz').write_bytes(archive)
+          print('Verified all 42 source files against their original SHA-256 inventory.')
+          PY
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Test source and generated editions
+        run: |
+          npm test
+          python3 -m unittest discover -s tests -p 'test_*.py' -v
+          for file in src/*.js; do node --check "$file"; done
+          bash -n tools/publish-github.sh
+          sha256sum shaders/compat-scene.glsl Aether-Orb-Odyssey.html > "$RUNNER_TEMP/generated.sha256"
+          python3 tools/build_compat.py
+          python3 tools/build_single.py
+          sha256sum --check "$RUNNER_TEMP/generated.sha256"
+      - name: Install pinned browser verification dependencies
+        run: |
+          python3 -m pip install playwright==1.58.0 pillow==12.1.0
+          python3 -m playwright install --with-deps chromium
+          BROWSER=$(python3 - <<'PY'
+          from playwright.sync_api import sync_playwright
+          with sync_playwright() as p:
+              print(p.chromium.executable_path)
+          PY
+          )
+          sudo ln -sf "$BROWSER" /usr/bin/chromium
+      - name: Re-render previews and test browser controls
+        run: |
+          python3 - <<'PY'
+          import asyncio, importlib.util
+          spec = importlib.util.spec_from_file_location('odyssey_smoke', 'tests/browser_smoke.py')
+          module = importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(module)
+          asyncio.run(asyncio.wait_for(module.main(), timeout=600))
+          PY
+      - name: Record import provenance and screenshot contact sheet
+        run: |
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          from PIL import Image, ImageDraw, ImageOps
+          paths = sorted(Path('previews').glob('*.png'))
+          sheet = Image.new('RGB', (1600, 1996), '#080b12')
+          draw = ImageDraw.Draw(sheet)
+          for i, path in enumerate(paths):
+              x, y = (i % 2) * 800, (i // 2) * 399
+              with Image.open(path) as im:
+                  tile = ImageOps.contain(im.convert('RGB'), (784, 355))
+                  sheet.paste(tile, (x + (800-tile.width)//2, y + 8))
+              draw.text((x+16, y+369), path.stem + ' / CI compatibility render', fill='#d6e7ff')
+          sheet.save('previews/contact-sheet.jpg', quality=90)
+          Path('docs/IMPORT-PROVENANCE.md').write_text(
+              '# GitHub import provenance\n\n'
+              'The original 42 text files were transported without edits in a SHA-256-verified archive. '
+              'The exact text baseline is retained in `source-baseline.tar.xz`; the Pages workflow is installed separately by the connected account.\n\n'
+              'The repository has new import commits. It does not reproduce the earlier local Git history. '
+              'The earlier ZIP and history bundle remain separate original handoff artifacts.\n\n'
+              'The original PNG/JPEG preview bytes were not transferred. All ten preview frames and their contact sheet '
+              'were regenerated from the unchanged application by this GitHub Actions run. '
+              '`tests/browser-results.json` is the new run report. The older QA and publication documents are historical.\n\n'
+              'Browser verification uses the explicitly labelled WebGL2 compatibility renderer in Chromium/SwiftShader. '
+              'It does not establish native WebGPU or physical-device performance. The audio transport fixture is discarded; '
+              'the actual credited recording is fetched and verified separately by the Pages build.\n\n'
+              f'Import run: https://github.com/{os.environ["GITHUB_REPOSITORY"]}/actions/runs/{os.environ["GITHUB_RUN_ID"]}\n',
+              encoding='utf-8')
+          report = json.loads(Path('tests/browser-results.json').read_text())
+          assert not report['errors']
+          print('All preview frames and browser checks completed.')
+          PY
+      - name: Commit complete import and verification output
+        run: |
+          python3 tools/manifest.py write
+          python3 tools/manifest.py check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'Import complete Odyssey app, tools, tests and regenerated previews'
+          git push origin HEAD:main
