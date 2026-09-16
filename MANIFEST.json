@@ -20,8 +20,8 @@
     "sha256": "e2e1581a9bb133db3cc6b58efd7986b07a65a52e469db5032154f83995f03dd8"
   },
   ".github/workflows/repair-recording.yml": {
-    "bytes": 4569,
-    "sha256": "8046b7924c184487b004e411ce29ea826194ac35e29f4e9701ed0e00f3f9db57"
+    "bytes": 4926,
+    "sha256": "97900407ed52edccdf62b281b8c995ca28945996e272ff9619f7c9b2a1e8c8a6"
   },
   ".gitignore": {
     "bytes": 110,
@@ -216,8 +216,8 @@
     "sha256": "10c9597719dfb50b29b94283fd7e8d7d0ce90c80d3a6c402e7319e5bb4a137a0"
   },
   "tests/audio_browser.py": {
-    "bytes": 9817,
-    "sha256": "16bbcf062d0bd52d4606784f9b1b69c7861a15b39e5462e6eba19a6ef886093e"
+    "bytes": 9818,
+    "sha256": "09f7eed30a34130b9244e4885dcc17df6ce20d6fbd8a7b488769e83169d5b6d2"
   },
   "tests/browser-results.json": {
     "bytes": 776,
