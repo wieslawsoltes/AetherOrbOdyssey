@@ -5,7 +5,7 @@
 <meta name="theme-color" content="#05060a">
 <meta name="description" content="Aether Orb. A cinematic real-time WebGPU concept film by CrystalBall. Music: Richard Strauss, performed by Kevin MacLeod.">
 <title>Aether Orb — Odyssey / CrystalBall</title>
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="style.css?v=recording-3">
 </head>
 <body>
 <main id="stage" aria-label="Aether Orb cinematic product film">
@@ -49,6 +49,11 @@
  </footer>
  <nav id="chapters" aria-label="Film chapters" hidden></nav>
  <div id="audioError" class="audio-error" role="alert" hidden><strong>Sound needs your attention.</strong><p id="audioErrorText"></p><div><button id="retryAudio">Enable sound</button><label class="file-button">Choose audio<input id="audioFile" type="file" accept="audio/*"></label><button id="silent">Watch silent</button></div></div>
+ <aside id="recordHUD" class="record-hud" aria-label="Video recording" hidden>
+  <span id="recordProgress" role="status" aria-live="polite"></span>
+  <button id="recordStop" type="button" hidden>Stop &amp; save</button>
+  <a id="recordDownload" hidden>Download video</a>
+ </aside>
  <div id="fatal" class="fatal" role="alert" hidden><p class="eyebrow">RENDERER STATUS</p><h2>WebGPU needs your attention.</h2><p id="fatalText"></p><p>Serve the folder with <code>python3 tools/serve.py</code> and open <code>http://localhost:8080</code>. Use a browser with WebGPU and hardware acceleration enabled.</p><button onclick="location.reload()">Retry</button> <button onclick="const u=new URL(location.href);u.searchParams.set('compat','1');location.href=u">WebGL2 compatibility</button></div>
 </main>
 <dialog id="credits">
@@ -60,10 +65,10 @@
  <p class="muted">The score loads from the local assets folder when present, otherwise from Wikimedia Commons, and is cached when the browser allows it. Locally selected replacement audio is never uploaded. The source and license above apply to the default recording only; update credits and obtain any necessary rights for replacement audio.</p>
  <h3>Sound check</h3><p>Tap play below to test the recording through the native media player. This pauses the film. Check media volume and your Bluetooth or AirPlay output. Older iOS versions without playback-session support may also require Silent Mode to be off for the film.</p>
  <audio id="testSound" controls preload="none" src="./assets/zarathustra.mp3" style="width:100%" aria-label="Test the orchestral recording"></audio>
- <h3>Local capture</h3><p>Record the film with titles and sound in your browser. Export uses your current render resolution and codec support; it runs in real time.</p>
- <button id="recordFilm" class="primary-small">Record film</button><span id="recordStatus" role="status"></span>
+ <h3>Local capture</h3><p>Record the film with titles and sound in your browser. Export runs in real time, up to 1080p at a 30 fps capture ceiling (actual rate depends on rendering speed). Keep this tab visible. Stop &amp; save finishes early; pausing the film pauses recording. Your finished video remains available through Download video.</p>
+ <button id="recordFilm" class="primary-small">Record film</button><span id="recordStatus" role="status"></span> <a id="recordDownloadCredits" hidden>Download video</a>
  <p class="muted">Space: play/pause · ← / →: seek · R: replay · M: mute · F: fullscreen · C: credits.</p>
  <details><summary>Renderer diagnostics</summary><pre id="diagnostics"></pre></details>
 </dialog>
-<script type="module" src="src/app.js?v=ios-audio-2"></script>
+<script type="module" src="src/app.js?v=recording-3"></script>
 </body></html>

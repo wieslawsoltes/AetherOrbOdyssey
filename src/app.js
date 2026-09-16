@@ -1,7 +1,7 @@
-import {FilmRenderer} from './renderer.js';
+import {FilmRenderer} from './renderer.js?v=recording-3';
 import {CompatibilityRenderer} from './compatibility.js';
 import {Soundtrack,MUSIC} from './audio.js?v=ios-audio-2';
-import {LocalFilmRecorder} from './export.js';
+import {LocalFilmRecorder} from './export.js?v=recording-3';
 import {sampleFilm,SHOTS,DURATION,ease,clamp} from './director.js';
 
 const $=s=>document.querySelector(s);
@@ -13,6 +13,8 @@ const soundtrack=new Soundtrack();
 const recorder=new LocalFilmRecorder(renderer,soundtrack);
 let running=false,started=false,ended=false,manualTime=0,busy=false,pendingFrame=null,lastTitle=null,hideTimer,recording=false;
 let scrubWasRunning=false,creditsWasRunning=false,startRequest=0;
+let recordPreparing=false,recordLimit=DURATION,finishingRecording=null;
+let paintComplete=Promise.resolve();
 const format=t=>`${String(Math.floor(t/60)).padStart(2,'0')}:${String(Math.floor(t%60)).padStart(2,'0')}`;
 const timeNow=()=>running?Math.min(soundtrack.time,DURATION):manualTime;
 
@@ -42,21 +44,23 @@ function titleFrame(f){
 async function paint(time,{force=false,poster=false}={}){
  if(!renderer.ready)return;
  if(busy&&!force){pendingFrame={time,poster};return;}
- if(busy&&force){await renderer.device.queue.onSubmittedWorkDone();}
- busy=true;
+ const previousPaint=paintComplete;let completePaint;
+ const ownPaint=paintComplete=new Promise(resolve=>completePaint=resolve);
+ busy=true;await previousPaint;
  try {
   const rect=world.getBoundingClientRect();const f=sampleFilm(time,rect.width/rect.height);
-  await renderer.render(f,{audioEnergy:soundtrack.energyAt(time),wait:true});
+  const capture=recording&&recorder.needsFrame(time);
+  const image=await renderer.render(f,{audioEnergy:soundtrack.energyAt(time),wait:true,capture});
   titleFrame(f);
   const slug=`${String(SHOTS.indexOf(f.shot)+1).padStart(2,'0')} / ${f.shot.name.toUpperCase()}`;
   $('#chapterSlug').textContent=started?slug:'';
   $('#assembly-labels').style.opacity=started&&f.shot.name==='Architecture'?ease((time-59)/1.5)*ease((68.4-time)/.8)*.8:0;
   if(!poster)transport(ended?DURATION:time);
-  if(recording)recorder.frame(time);
- } finally{busy=false;}
+  if(capture){recorder.frame(time,image);updateRecordingUI(time);}
+ } finally{if(paintComplete===ownPaint)busy=false;completePaint();}
  if(pendingFrame&&!force){const next=pendingFrame;pendingFrame=null;queueMicrotask(()=>paint(next.time,{poster:next.poster}));}
 }
-function fatal(error){running=false;soundtrack.pause();document.body.classList.remove('playing');$('#fatal').hidden=false;$('#fatalText').textContent=error?.message||String(error);$('#loadStatus').textContent='Renderer unavailable';console.error(error);}
+function fatal(error){if(recording){recorder.fail(error);recording=false;updateRecordingUI();}running=false;soundtrack.pause();document.body.classList.remove('playing');$('#fatal').hidden=false;$('#fatalText').textContent=error?.message||String(error);$('#loadStatus').textContent='Renderer unavailable';console.error(error);}
 function updateSoundControl(){
  const available=!!soundtrack.buffer&&!soundtrack.silent;
  const blocked=soundtrack.context&&soundtrack.context.state!=='running';
@@ -87,7 +91,7 @@ async function start({silent=false,from=0,skipLoad=false}={}){
   const playing=await soundtrack.play(manualTime);
   if(request!==startRequest||document.hidden){soundtrack.pause();return;}
   if(!playing)return;
-  started=true;ended=false;running=true;
+  started=true;ended=false;running=true;if(recording)recorder.resume();
   $('#gate').hidden=true;$('#filmType').hidden=false;
   document.body.classList.add('playing');revealControls();updateSoundControl();
   $('#loadStatus').textContent=silent?'Silent preview':'Orchestra ready';
@@ -97,6 +101,7 @@ async function start({silent=false,from=0,skipLoad=false}={}){
 function pause(){
  if(running)manualTime=clamp(soundtrack.time,0,DURATION);
  soundtrack.pause();running=false;
+ if(recording)recorder.pause();
  document.body.classList.remove('playing','idle');transport(manualTime);
 }
 async function toggle(){
@@ -104,17 +109,18 @@ async function toggle(){
  if(!started||ended){await start({silent:soundtrack.silent,from:0});return;}
  if(!soundtrack.buffer&&!soundtrack.silent){await start({from:manualTime});return;}
  try{
-  if(await soundtrack.play(manualTime)){running=true;document.body.classList.add('playing');revealControls();}
+  if(await soundtrack.play(manualTime)){running=true;if(recording)recorder.resume();document.body.classList.add('playing');revealControls();}
  }catch(error){audioError(error);}
 }
 async function seek(time,{resume=false}={}){
+ if(recording||recordPreparing)throw new Error('Stop recording before seeking.');
  // Preserve the trusted gesture even when painting the seek frame is asynchronous.
  const activation=resume&&!soundtrack.silent?soundtrack.unlock():Promise.resolve();
  pause();started=true;ended=false;$('#gate').hidden=true;manualTime=clamp(time,0,DURATION);soundtrack.offset=manualTime;
  try{
   await activation;await paint(manualTime,{force:true});
   if(resume&&!soundtrack.buffer&&!soundtrack.silent){await start({from:manualTime});return;}
-  if(resume&&await soundtrack.play(manualTime)){running=true;document.body.classList.add('playing');revealControls();}
+  if(resume&&await soundtrack.play(manualTime)){running=true;if(recording)recorder.resume();document.body.classList.add('playing');revealControls();}
  }catch(error){audioError(error);}
 }
 async function enableSound(){
@@ -130,9 +136,9 @@ async function tick(){
  try {
   if(running&&!busy){
    const t=timeNow();await paint(t);
+   if(recording&&t>=recordLimit)await stopRecording();
    if(t>=DURATION){
     pause();manualTime=DURATION;ended=true;
-    if(recording){recording=false;document.body.classList.remove('recording');await recorder.stop();$('#recordStatus').textContent='Recording saved.';}
     await paint(84.7);transport(DURATION);
    }
   }
@@ -163,29 +169,90 @@ $('#credits').addEventListener('close',()=>{if(creditsWasRunning&&!recording){cr
 $('#retryAudio').addEventListener('click',()=>{soundtrack.setMuted(false);start({from:ended?0:timeNow()});});
 $('#silent').addEventListener('click',()=>start({silent:true,from:ended?0:timeNow()}));
 $('#audioFile').addEventListener('change',async e=>{const file=e.target.files?.[0];if(!file)return;try{await soundtrack.importFile(file);await start({skipLoad:true});}catch(error){audioError(error);}});
-$('#recordFilm').addEventListener('click',async()=>{
- if(recording)return;
- try {
-  await soundtrack.unlock();await soundtrack.load();pause();creditsWasRunning=false;$('#credits').close();
-  await seek(0);const result=recorder.start();result.catch(error=>{recording=false;document.body.classList.remove('recording');$('#recordStatus').textContent=error.message;});
-  recording=true;document.body.classList.add('recording');$('#recordStatus').textContent='Recording…';await start();
- }catch(e){$('#recordStatus').textContent=e.message;}
-});
+function updateRecordingUI(time=timeNow()){
+ const locked=recording||recordPreparing||!!finishingRecording;
+ document.body.classList.toggle('recording',locked);
+ for(const id of ['recordFilm','scrub','restart','quality','chaptersButton','audioFile'])$('#'+id).disabled=locked;
+ $('#recordStop').hidden=!locked;$('#recordStop').disabled=recordPreparing||!!finishingRecording;
+ $('#recordHUD').hidden=!locked&&!recorder.result&&!recorder.lastError;
+ const d=recorder.diagnostics;
+ let label='';
+ if(recordPreparing)label='Preparing video and orchestra…';
+ else if(finishingRecording||d.state==='stopping')label='Finalizing video…';
+ else if(recording)label=`${d.state==='paused'?'Recording paused':'Recording'} · ${format(time)} / ${format(recordLimit)} · ${d.width} × ${d.height} · ${(d.bytes/1048576).toFixed(1)} MB`;
+ else if(recorder.lastError)label='Recording failed: '+recorder.lastError;
+ else if(recorder.result)label=`Video ready · ${(recorder.result.bytes/1048576).toFixed(1)} MB · Download video`;
+ $('#recordStatus').textContent=label;$('#recordProgress').textContent=label;
+ for(const id of ['recordDownload','recordDownloadCredits']){
+  const link=$('#'+id);link.hidden=!recorder.result;
+  if(recorder.result){link.href=recorder.result.url;link.download=recorder.result.filename;link.textContent='Download '+(recorder.result.filename.endsWith('.mp4')?'MP4':'WebM');}
+  else{link.removeAttribute('href');link.removeAttribute('download');}
+ }
+}
+async function startRecording({from=0,to=DURATION}={}){
+ if(recording||recordPreparing||finishingRecording)return;
+ if(!Number.isFinite(from)||!Number.isFinite(to)||from<0||from>=to||to>DURATION)throw new RangeError('Invalid recording range.');
+ const activation=soundtrack.unlock(); // Must remain in the original trusted tap.
+ recordPreparing=true;recorder.lastError=null;updateRecordingUI();++startRequest;pause();
+ try{
+  await activation;await soundtrack.load();
+  if(!renderer.ready||document.hidden)throw new Error('Keep the film tab visible while preparing the recording.');
+  soundtrack.silent=false;soundtrack.setMuted(false);$('#testSound').pause();
+  creditsWasRunning=false;$('#chapters').hidden=true;
+  await seekForRecording(from);
+  recordLimit=to;finishingRecording=null;
+  const done=recorder.start();recording=true;
+  done.catch(error=>{
+   if(finishingRecording)return;
+   recording=false;pause();updateRecordingUI();
+   $('#loadStatus').textContent=error.message;
+  });
+  await paint(from,{force:true}); // Supply a complete initial frame before waiting for onstart.
+  await recorder.ready;
+  if(!await soundtrack.play(from))throw new Error('Recording playback was cancelled.');
+  running=true;started=true;ended=false;$('#gate').hidden=true;
+  document.body.classList.add('playing');$('#credits').close();revealControls();updateSoundControl();
+ }catch(error){
+  recorder.fail(error);recording=false;pause();
+ }finally{recordPreparing=false;updateRecordingUI();}
+}
+async function seekForRecording(time){
+ pendingFrame=null;await paintComplete;
+ started=true;ended=false;manualTime=time;soundtrack.offset=time;$('#gate').hidden=true;
+ await paint(time,{force:true});
+}
+async function stopRecording(){
+ if(finishingRecording)return finishingRecording;
+ if(!recording)return null;
+ finishingRecording=(async()=>{
+  pause();await paintComplete;recording=false;
+  try{
+   const blob=await recorder.stop();
+   // Best effort automatic download plus a persistent, user-gesture download.
+   try{recorder.download();}catch{}return blob;
+  }catch(error){$('#loadStatus').textContent=error.message;return null;}
+  finally{renderer.releaseCapture?.();finishingRecording=null;updateRecordingUI();revealControls();}
+ })();updateRecordingUI();return finishingRecording;
+}
+$('#recordFilm').addEventListener('click',()=>startRecording());
+$('#recordStop').addEventListener('click',()=>stopRecording());
+recorder.addEventListener('change',()=>updateRecordingUI());
 soundtrack.addEventListener('status',e=>$('#loadStatus').textContent=e.detail);
 soundtrack.addEventListener('change',updateSoundControl);
 soundtrack.addEventListener('interruption',()=>audioError(new Error('Audio was interrupted by iOS or another app. Tap “Enable sound” to continue from this scene.')));
-soundtrack.addEventListener('ended',()=>{pause();if(manualTime<DURATION-.25)audioError(new Error('The selected recording has ended. Replay or choose a longer recording.'));});
+soundtrack.addEventListener('ended',()=>{if(recording){stopRecording();return;}pause();if(manualTime<DURATION-.25)audioError(new Error('The selected recording has ended. Replay or choose a longer recording.'));});
 $('#testSound').addEventListener('play',()=>{pause();});
 $('#credits').addEventListener('close',()=>$('#testSound').pause());
 renderer.addEventListener('lost',e=>fatal(e.detail));renderer.addEventListener('error',e=>fatal(e.detail));
 window.addEventListener('pointermove',revealControls,{passive:true});window.addEventListener('pointerdown',revealControls,{passive:true});
 window.addEventListener('keydown',async e=>{
  if(e.target.matches('input,select,textarea')||$('#credits').open)return;
+ if((recording||recordPreparing)&&['ArrowLeft','ArrowRight','KeyR','KeyC'].includes(e.code)){e.preventDefault();return;}
  if(['Space','ArrowLeft','ArrowRight','KeyR','KeyM','KeyF','KeyC'].includes(e.code))e.preventDefault();
  switch(e.code){case'Space':await toggle();break;case'ArrowLeft':await seek(timeNow()-5,{resume:running});break;case'ArrowRight':await seek(timeNow()+5,{resume:running});break;case'KeyR':await start({silent:soundtrack.silent});break;case'KeyM':$('#sound').click();break;case'KeyF':await fullscreen();break;case'KeyC':$('#creditsButton').click();break;}
  revealControls();
 });
-document.addEventListener('visibilitychange',()=>{if(document.hidden){++startRequest;pause();$('#start').disabled=false;}updateSoundControl();});
+document.addEventListener('visibilitychange',()=>{if(document.hidden){++startRequest;pause();$('#start').disabled=false;updateRecordingUI();}updateSoundControl();});
 let resizeTimer;window.addEventListener('resize',()=>{clearTimeout(resizeTimer);resizeTimer=setTimeout(async()=>{if(!renderer.ready||recording)return;await renderer.device.queue.onSubmittedWorkDone();renderer.resize();if(!running)await paint(started?(ended?84.7:manualTime):82,{poster:!started});},120);});
 
 const ready=(async()=>{
@@ -199,11 +266,12 @@ const ready=(async()=>{
   requestAnimationFrame(tick);return true;
  }catch(e){fatal(e);return false;}
 })();
-updateSoundControl();
+updateSoundControl();updateRecordingUI();
 // Public deterministic capture interface. It deliberately does not auto-play sound.
 window.__film={
- ready,renderer,soundtrack,get state(){return {running,started,ended,time:timeNow(),errors:renderer.errors};},
+ ready,renderer,soundtrack,recorder,record:startRecording,stopRecording,get state(){return {running,started,ended,time:timeNow(),errors:renderer.errors,recording,recordPreparing};},
  async frame(time,{width=0,height=0,quality=null,clean=true}={}){
+  if(recording||recordPreparing)throw new Error('Stop recording before deterministic capture.');
   if(!await ready)throw new Error('Renderer initialization failed.');pause();pendingFrame=null;started=true;ended=false;manualTime=clamp(time,0,DURATION);$('#gate').hidden=true;
   if(clean)document.body.classList.add('capture-mode');else document.body.classList.remove('capture-mode');
   if(quality)renderer.setQuality(quality);if(width&&height)renderer.resize(true,width,height);

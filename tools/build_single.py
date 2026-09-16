@@ -15,7 +15,8 @@ def main():
         if filename=='compatibility.js':
             source=re.sub(r'^const loadCompat=async\(\)=>.*?;\n',"const loadCompat=async()=>INLINE_COMPAT;\n",source,flags=re.MULTILINE)
         code+='\n// -------- '+filename+' --------\n'+source
-    html=(ROOT/'index.html').read_text().replace('<link rel="stylesheet" href="style.css">','<style>\n'+(ROOT/'style.css').read_text()+'\n</style>')
+    html=(ROOT/'index.html').read_text()
+    html=re.sub(r'<link rel="stylesheet" href="style\.css(?:\?[^"]*)?">',lambda _:'<style>\n'+(ROOT/'style.css').read_text()+'\n</style>',html)
     html=re.sub(r'<script type="module" src="src/app\.js(?:\?[^"]*)?"></script>',lambda _:'<script type="module">\n'+code.replace('</script','<\\/script')+'\n</script>',html)
     (ROOT/'Aether-Orb-Odyssey.html').write_text(html)
     print(f'Built {ROOT / "Aether-Orb-Odyssey.html"} ({len(html):,} characters)')

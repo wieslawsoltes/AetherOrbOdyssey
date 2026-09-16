@@ -27,7 +27,9 @@ export class FilmRenderer extends EventTarget {
     this.context=this.canvas.getContext('webgpu');
     if(!this.context)throw new Error('Cannot create a WebGPU canvas context.');
     this.format=navigator.gpu.getPreferredCanvasFormat();
-    this.context.configure({device:this.device,format:this.format,alphaMode:'opaque'});
+    this.context.configure({device:this.device,format:this.format,alphaMode:'opaque',
+      usage:GPUTextureUsage.RENDER_ATTACHMENT|GPUTextureUsage.COPY_SRC});
+    this.requiresReadback=true;
     const d=this.device;
     const [common,scene,particles,post]=await Promise.all(['common','scene','particles','post'].map(load));
     const particleRead=particles.slice(0,particles.indexOf('@compute')).replace('read_write','read')+particles.slice(particles.indexOf('struct ParticleVertex'));
@@ -123,7 +125,7 @@ export class FilmRenderer extends EventTarget {
     const pass=encoder.beginRenderPass({label,colorAttachments:[{view,loadOp:'clear',storeOp:'store',clearValue:{r:0,g:0,b:0,a:1}}]});
     pass.setPipeline(pipeline);pass.setBindGroup(0,group);pass.draw(3);pass.end();
   }
-  async render(film,{audioEnergy=0,wait=false}={}) {
+  async render(film,{audioEnergy=0,wait=false,capture=false}={}) {
     if(!this.ready)return;
     const start=performance.now();const {forward,right,up}=cameraBasis(film.camera,film.target);const q=QUALITIES[this.quality];
     this.values.set([this.width,this.height,film.time,this.width/this.height],0);
@@ -144,9 +146,50 @@ export class FilmRenderer extends EventTarget {
       pass.setPipeline(this.particlePipeline);pass.setBindGroup(0,this.commonGroup);pass.setBindGroup(1,this.particleGroup);pass.draw(6,q.particles);pass.end();
     }
     for(const p of this.passes)this.drawPass(enc,p.pipeline,p.group,p.view);
-    this.drawPass(enc,this.finalPipeline,this.finalGroup,this.context.getCurrentTexture().createView(),'Tone mapping / fine grain');
+    // Copy the SAME swapchain texture in the SAME submission, before presentation.
+    // Awaiting onSubmittedWorkDone and then drawImage(canvas) can read a recycled
+    // WebGPU drawing buffer. COPY_SRC + mapped readback has an explicit lifetime.
+    const output=this.context.getCurrentTexture();
+    this.drawPass(enc,this.finalPipeline,this.finalGroup,output.createView(),'Tone mapping / fine grain');
+    let readback=null;
+    if(capture){
+      const layout=readbackLayout(this.width,this.height);
+      if(!this.captureBuffer||this.captureBuffer.size!==layout.size){
+        this.releaseCapture();
+        this.captureBuffer=this.device.createBuffer({label:'Recording RGBA readback',size:layout.size,
+          usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ});
+      }
+      readback=this.captureBuffer;
+      enc.copyTextureToBuffer({texture:output},{buffer:readback,bytesPerRow:layout.bytesPerRow},[this.width,this.height]);
+    }
     this.device.queue.submit([enc.finish()]);this.frames++;
-    if(wait){await this.device.queue.onSubmittedWorkDone();this.gpuMs=this.gpuMs*.9+(performance.now()-start)*.1;}
+    let image=null;
+    if(readback){
+      await readback.mapAsync(GPUMapMode.READ);
+      try{
+        const data=unpackCapturePixels(new Uint8Array(readback.getMappedRange()),this.width,this.height,this.format);
+        image=new ImageData(data,this.width,this.height);
+      }finally{readback.unmap();}
+    }else if(wait){await this.device.queue.onSubmittedWorkDone();}
+    if(wait||capture)this.gpuMs=this.gpuMs*.9+(performance.now()-start)*.1;
+    return image;
   }
-  dispose(){this.ready=false;for(const r of this.resources)r.destroy();this.uniform?.destroy();this.finalUniform?.destroy();this.particleBuffer?.destroy();this.engraving?.destroy();this.context?.unconfigure();this.device?.destroy();}
+  releaseCapture(){this.captureBuffer?.destroy();this.captureBuffer=null;}
+  dispose(){this.releaseCapture();this.ready=false;for(const r of this.resources)r.destroy();this.uniform?.destroy();this.finalUniform?.destroy();this.particleBuffer?.destroy();this.engraving?.destroy();this.context?.unconfigure();this.device?.destroy();}
+}
+
+/** Texture-to-buffer rows must be 256-byte aligned; dimensions need not be. */
+export function readbackLayout(width,height){
+ if(!Number.isInteger(width)||!Number.isInteger(height)||width<1||height<1)throw new RangeError('Invalid capture dimensions.');
+ const bytesPerRow=Math.ceil(width*4/256)*256;
+ return {bytesPerRow,size:bytesPerRow*height};
+}
+export function unpackCapturePixels(bytes,width,height,format){
+ const {bytesPerRow,size}=readbackLayout(width,height);
+ if(bytes.byteLength<size)throw new RangeError('Incomplete GPU capture buffer.');
+ if(format!=='rgba8unorm'&&format!=='bgra8unorm')throw new Error(`Unsupported capture format: ${format}`);
+ const pixels=new Uint8ClampedArray(width*height*4);
+ for(let y=0;y<height;y++)pixels.set(bytes.subarray(y*bytesPerRow,y*bytesPerRow+width*4),y*width*4);
+ if(format==='bgra8unorm')for(let i=0;i<pixels.length;i+=4){const blue=pixels[i];pixels[i]=pixels[i+2];pixels[i+2]=blue;}
+ return pixels;
 }
