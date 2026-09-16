@@ -36,8 +36,8 @@
     "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
   },
   "Aether-Orb-Odyssey.html": {
-    "bytes": 149276,
-    "sha256": "3e4833dc3ee08839156af35d1d2fa29ccd8bf73f80b0cbc3585a22d521959d9e"
+    "bytes": 149300,
+    "sha256": "865fe93007a646ab81d9089d50608310414eb997725cca3f14ac9013242d9cfe"
   },
   "NOTICE.md": {
     "bytes": 3500,
@@ -180,8 +180,8 @@
     "sha256": "254a97f575267aa1bb0fb1840cd52bc888559f53ff836dc61689364146bf8f28"
   },
   "shaders/compat-scene.glsl": {
-    "bytes": 13646,
-    "sha256": "8cd4eeecf5e520a8f4d71777b76a47c1bb4afaa1eb3b329d21ed2a4fc07d7b12"
+    "bytes": 13658,
+    "sha256": "93418d31c133f92126106ab190aa3f6287262b90a0743fe0231154ad2a59d08f"
   },
   "shaders/particles.wgsl": {
     "bytes": 2201,
@@ -192,8 +192,8 @@
     "sha256": "885edc17ce3b7ee9ab3d68070bba605e6ca79fdedfbe122d2673ccc5d64e5da3"
   },
   "shaders/scene.wgsl": {
-    "bytes": 11963,
-    "sha256": "91e2a734957858c98a687f763cde4126513bde1cd465f805c0326190582e7542"
+    "bytes": 11975,
+    "sha256": "7d26b2262ccb253a2658df52bbda5bb802ac2b023f7b70ff4f16ed04caf379de"
   },
   "shaders/volumetric.wgsl": {
     "bytes": 1540,

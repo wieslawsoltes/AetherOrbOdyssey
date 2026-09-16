@@ -232,10 +232,10 @@ vec3 holography(vec3 ro,vec3 rd,float sceneDepth){
    float distance=dot(center-ro,normal)/denom;
    if(distance>0.0 && distance<sceneDepth){
     vec3 p=ro+rd*distance-center;float radius=length(p);float angle=atan(p.z,p.x);
-    float target=1.40+k*.35;float footprint=max(.004,distance*u.camera.w/u.resolution.y*1.4);
-    float ring=exp(-pow((radius-target)/footprint,2.0));
+    float ringRadius=1.40+k*.35;float footprint=max(.004,distance*u.camera.w/u.resolution.y*1.4);
+    float ring=exp(-pow((radius-ringRadius)/footprint,2.0));
     float dash=smoothstep(.05,.22,sin(angle*(22.0+k*9.0)+u.resolution.z*(.24-k*.43)));
-    float ticks=pow(max(0.0,cos(angle*64.0)),28.0)*(1.0-smoothstep(.016,.043,abs(radius-target+.05)));
+    float ticks=pow(max(0.0,cos(angle*64.0)),28.0)*(1.0-smoothstep(.016,.043,abs(radius-ringRadius+.05)));
     float breathing=.65+.35*sin(u.resolution.z*.65+k);
     light+=mix(vec3(.055,.35,.78),vec3(.40,.23,.08),k*.5)*(ring*dash+ticks*.55)*strength*breathing;
    }
