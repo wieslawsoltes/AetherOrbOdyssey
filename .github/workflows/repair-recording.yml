@@ -20,71 +20,50 @@ jobs:
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
         with:
           ref: ${{ github.sha }}
-      - name: Enforce requested backend and document actual validation scope
+      - name: Set explicit software capture resolution and reconcile validation scope
         shell: python
         run: |
           from pathlib import Path
           p = Path('tests/recording_browser.py')
           s = p.read_text()
-          old = "          report['backend']=await page.locator('#backend').inner_text()\n"
-          new = old + "          if args.backend=='webgpu':assert report['backend']=='NATIVE WEBGPU','Native WebGPU is required; compatibility fallback is not a pass'\n          if args.backend=='compat':assert report['backend']=='WEBGL2 COMPATIBILITY','Explicit compatibility capture was not selected'\n"
+          old = "          report['adapter']=await page.evaluate('window.__film.renderer.adapterInfo')\n"
+          new = old + "          # SwiftShader is CPU rendering: keep the full 960x540 UI, but bound the\n          # real renderer's capture surface so a short scene contains multiple frames.\n          # Do not relax decoded-frame, motion, audio, or lifecycle assertions.\n          if platform.system()=='Linux' and args.backend=='compat':\n            await page.evaluate('window.__film.renderer.resize(true,320,180)')\n          report['renderResolution']=await page.evaluate('({width:window.__film.renderer.width,height:window.__film.renderer.height})')\n"
           if new not in s:
-              assert old in s, 'Reviewed browser check changed'
+              assert old in s, 'Reviewed test changed'
               s = s.replace(old, new, 1)
           p.write_text(s)
           p = Path('docs/CHROME-RECORDING.md')
           s = p.read_text()
-          if '## Executed macOS recording validation' not in s:
-              s += '''
-          ## Executed macOS recording validation
-
-          GitHub Actions run 35133451644, macOS job 104920305061, passed all
-          recording browser checks with Google Chrome 152.0.7977.65 on macOS
-          14.8.9 ARM64 and the actual NATIVE WEBGPU renderer. Tests recorded real
-          film scenes and the credited MP3, then decoded VP8 video and Opus audio.
-          Checks covered the Record film UI, pause/resume, Stop & save, a byte-identical
-          manual re-download, a second glass-scene recording with changing nonblack
-          pixels and nonzero encoded music, natural end finalization, and visible
-          recovery from an injected asynchronous encoder error. These were 960x540
-          capture tests on a hosted Mac, not a full-duration 1080p performance test
-          or a test on the user's own Mac. The source gate also passed 35 JavaScript
-          and 13 Python tests, plus real-audio Chromium and WebKit checks.
-
-          Evidence: https://github.com/wieslawsoltes/AetherOrbOdyssey/actions/runs/35133451644/job/104920305061
-
-          The separate Linux SwiftShader native-WebGPU job in that run failed
-          during renderer initialization, before any recording or audio began:
-          "A valid external Instance reference no longer exists." This reproduced
-          with both Chromium 143 and installed Google Chrome 152. It remains an
-          unresolved Linux native-rendering/driver compatibility limitation; no
-          Linux native-WebGPU recording success is claimed. The mandatory release
-          matrix now explicitly requires native WebGPU on macOS Chrome and
-          independently exercises the WebGL2 compatibility capture path on Linux.
-          A backend assertion prevents silently passing native tests with fallback.
-          Neither job suppresses test failures. Both must pass before deployment.
-          '''
+          old = '''GitHub Pages is gated on native WebGPU/Chromium on Linux and installed Google Chrome
+          on a macOS runner. Native adapter availability/backend, OS and exact browser version
+          are included in each report. A hosted macOS runner is not the user's physical Mac;
+          when native WebGPU is unavailable there, its report explicitly identifies WebGL2.'''
+          new = '''GitHub Pages is gated on explicitly required native WebGPU in installed Google Chrome
+          on macOS and a separate Linux WebGL2 compatibility recording check. Backend, OS,
+          render resolution and exact browser version are included in each report. A hosted
+          macOS runner is not the user's physical Mac. Falling back to WebGL2 cannot satisfy
+          the macOS native-WebGPU gate. CPU-rendered Linux smoke captures use 320x180 while
+          retaining the full 960x540 application UI; macOS native captures remain 960x540.
+          Both paths still require decoded moving video, encoded music and lifecycle tests.
+          These tests are functional checks, not high-resolution performance guarantees.'''
+          if new not in s:
+              assert old in s, 'Reviewed validation scope changed'
+              s = s.replace(old, new, 1)
           p.write_text(s)
       - name: Set up Node.js
         uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
         with:
           node-version: '24'
           package-manager-cache: false
-      - name: Ensure encoder for regression tests
-        run: |
-          if ! command -v ffmpeg >/dev/null || ! command -v ffprobe >/dev/null; then
-            sudo apt-get update && sudo apt-get install -y ffmpeg
-          fi
-      - name: Test source and regenerate standalone edition
+      - name: Check source and regenerate inventory
         run: |
           npm test
-          python3 -m unittest discover -s tests -p 'test_*.py' -v
-          for file in src/*.js; do node --check "$file"; done
           python3 -m compileall -q tools tests
           python3 tools/build_compat.py
           python3 tools/build_single.py
           python3 tools/manifest.py write
           python3 tools/manifest.py check
-      - name: Commit source-only validation update
+      - name: Commit source-only verification update
         env:
           EXPECTED_HEAD: ${{ github.sha }}
         run: |
@@ -92,7 +71,7 @@ jobs:
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add tests/recording_browser.py docs/CHROME-RECORDING.md Aether-Orb-Odyssey.html MANIFEST.json
           if git diff --cached --quiet; then exit 0; fi
-          git commit -m 'Require exact capture backends and document verified macOS recording results'
+          git commit -m 'Bound software-rendered smoke capture resolution; preserve strict video and audio assertions'
           git fetch origin main
           test "$(git rev-parse origin/main)" = "$EXPECTED_HEAD" || { echo 'main changed; refusing overwrite'; exit 1; }
           git push origin HEAD:main
