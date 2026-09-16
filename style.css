@@ -13,3 +13,12 @@
 .record-hud button,.record-hud a,#recordDownloadCredits{color:#e5eeff;border:1px solid #8297b7;padding:7px 12px;text-decoration:none;border-radius:3px}
 .record-hud [role=status]{max-width:min(600px,70vw);overflow-wrap:anywhere}
 .capture-mode .record-hud{display:none!important}
+
+/* Cinematic settings: controls stay outside the captured film. */
+.cinema-settings{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:center;margin:18px 0}
+.cinema-settings select{width:100%;background:#101522;color:#e4eafa;border:1px solid #303b52;border-radius:8px;padding:10px;font:inherit}
+.cinema-settings .toggle-setting{grid-column:1/-1;display:flex;align-items:center;gap:10px;font-size:13px}
+.cinema-settings input{accent-color:#92baff;width:17px;height:17px}
+#performanceHUD{position:fixed;left:24px;top:72px;z-index:12;pointer-events:none;padding:12px 15px;border:1px solid #ffffff20;background:#060b14bc;color:#b4cce9;border-radius:8px;font:11px/1.6 ui-monospace,monospace;backdrop-filter:blur(10px)}
+.capture-mode #performanceHUD,.recording #performanceHUD{display:none!important}
+@media(max-width:580px){.cinema-settings{grid-template-columns:1fr}#performanceHUD{top:58px;left:12px;font-size:9px}}

@@ -92,7 +92,7 @@ async def check(root: Path, engines: list[str], report: Path, fixture: Path | No
                         async init(){this.ready=true;}async render(){this.frames++;}resize(){}setQuality(q){this.quality=q;}
                     }export {FilmRenderer as CompatibilityRenderer};"""
                     await context.route('**/src/renderer.js*',lambda route:route.fulfill(body=stub,content_type='text/javascript'))
-                    await context.route('**/src/compatibility.js',lambda route:route.fulfill(body=stub,content_type='text/javascript'))
+                    await context.route('**/src/compatibility.js*',lambda route:route.fulfill(body=stub,content_type='text/javascript'))
                     await page.close();page=await context.new_page();page.on('pageerror',lambda error:errors.append(str(error)))
                     await page.goto(f'http://127.0.0.1:{server.server_port}/index.html')
                     await page.wait_for_function('window.__film !== undefined')

@@ -1,5 +1,5 @@
-import {FilmRenderer} from './renderer.js?v=recording-3';
-import {CompatibilityRenderer} from './compatibility.js';
+import {FilmRenderer} from './renderer.js?v=cinema-1';
+import {CompatibilityRenderer} from './compatibility.js?v=cinema-1';
 import {Soundtrack,MUSIC} from './audio.js?v=ios-audio-2';
 import {LocalFilmRecorder} from './export.js?v=recording-3';
 import {sampleFilm,SHOTS,DURATION,ease,clamp} from './director.js';
@@ -8,7 +8,7 @@ const $=s=>document.querySelector(s);
 const stage=$('#stage'),world=$('#world'),params=new URLSearchParams(location.search);
 const initialQuality=params.get('quality')||'balanced';
 const RendererType=navigator.gpu&&!params.has('compat')?FilmRenderer:CompatibilityRenderer;
-const renderer=new RendererType(world,{quality:initialQuality});
+const renderer=new RendererType(world,{quality:initialQuality,look:params.get('look')||'cinematic',adaptive:!params.has('fixed')});
 const soundtrack=new Soundtrack();
 const recorder=new LocalFilmRecorder(renderer,soundtrack);
 let running=false,started=false,ended=false,manualTime=0,busy=false,pendingFrame=null,lastTitle=null,hideTimer,recording=false;
@@ -50,7 +50,7 @@ async function paint(time,{force=false,poster=false}={}){
  try {
   const rect=world.getBoundingClientRect();const f=sampleFilm(time,rect.width/rect.height);
   const capture=recording&&recorder.needsFrame(time);
-  const image=await renderer.render(f,{audioEnergy:soundtrack.energyAt(time),wait:true,capture});
+  const image=await renderer.render(f,{audioEnergy:soundtrack.energyAt(time),wait:force||recording||!running,capture,adaptive:running&&!force&&!recording&&!recordPreparing});
   titleFrame(f);
   const slug=`${String(SHOTS.indexOf(f.shot)+1).padStart(2,'0')} / ${f.shot.name.toUpperCase()}`;
   $('#chapterSlug').textContent=started?slug:'';
@@ -134,7 +134,7 @@ async function enableSound(){
 }
 async function tick(){
  try {
-  if(running&&!busy){
+  if(running&&!busy&&renderer.canSubmit!==false){
    const t=timeNow();await paint(t);
    if(recording&&t>=recordLimit)await stopRecording();
    if(t>=DURATION){
@@ -143,12 +143,28 @@ async function tick(){
    }
   }
  }catch(e){fatal(e);}
+ if($('#perfStats')?.checked&&performance.now()-lastPerfUpdate>500){lastPerfUpdate=performance.now();updatePerformanceHUD();}
  requestAnimationFrame(tick);
 }
 async function fullscreen(){try{if(document.fullscreenElement)await document.exitFullscreen();else await stage.requestFullscreen();}catch(e){$('#loadStatus').textContent=e.message;}}
 function updateDiagnostics(){
- $('#diagnostics').textContent=JSON.stringify({renderer:renderer.backend||'Native WebGPU / WGSL',resolution:`${renderer.width} × ${renderer.height}`,quality:renderer.quality,completedFrames:renderer.frames,submissionAndCompletionMs:Math.round(renderer.gpuMs*10)/10,shaderErrors:renderer.errors,adapter:renderer.adapterInfo,music:soundtrack.buffer?`${soundtrack.buffer.duration.toFixed(2)} s / ${soundtrack.buffer.sampleRate} Hz`:'Not yet loaded',audio:soundtrack.diagnostics,recording:recording},null,2);
+ $('#diagnostics').textContent=JSON.stringify({renderer:renderer.backend||'Native WebGPU / WGSL',resolution:`${renderer.width} × ${renderer.height}`,quality:renderer.quality,completedFrames:renderer.frames,submissionAndCompletionMs:Math.round(renderer.gpuMs*10)/10,shaderErrors:renderer.errors,adapter:renderer.adapterInfo,music:soundtrack.buffer?`${soundtrack.buffer.duration.toFixed(2)} s / ${soundtrack.buffer.sampleRate} Hz`:'Not yet loaded',audio:soundtrack.diagnostics,recording:recording,cinematic:renderer.diagnostics||null},null,2);
 }
+let lastPerfUpdate=0;
+function updatePerformanceHUD(){
+ const d=renderer.diagnostics;
+ $('#performanceHUD').hidden=!$('#perfStats').checked;
+ $('#performanceHUD').textContent=d?`${d.output.join(' × ')} output · ${d.internal.join(' × ')} scene\n${d.gpuTimestampMs===null?'Completion '+d.completionLatencyMs.toFixed(1):'GPU '+d.gpuTimestampMs.toFixed(1)} ms · CPU ${d.cpuSubmissionMs.toFixed(2)} ms\n${d.passes.length} passes · ${d.particles} particles · adaptive ${Math.round(d.adaptiveScale*100)}%`:'WebGL2 compatibility renderer';
+}
+$('#look').value=renderer.look||'clean';$('#adaptive').checked=renderer.adaptiveEnabled||false;
+$('#look').disabled=!renderer.setLook;$('#adaptive').disabled=!renderer.setAdaptiveEnabled;
+$('#look').addEventListener('change',async()=>{
+ if(recording||recordPreparing)return;
+ await paintComplete;await renderer.device.queue.onSubmittedWorkDone();renderer.setLook?.($('#look').value);
+ await paint(started?(ended?84.7:timeNow()):82,{force:true,poster:!started});updateDiagnostics();
+});
+$('#adaptive').addEventListener('change',()=>{renderer.setAdaptiveEnabled?.($('#adaptive').checked);updateDiagnostics();});
+$('#perfStats').addEventListener('change',updatePerformanceHUD);
 $('#start').addEventListener('click',()=>start());$('#playPause').addEventListener('click',toggle);
 $('#restart').addEventListener('click',()=>start({silent:soundtrack.silent}));
 $('#sound').addEventListener('click',enableSound);
@@ -170,6 +186,7 @@ $('#retryAudio').addEventListener('click',()=>{soundtrack.setMuted(false);start(
 $('#silent').addEventListener('click',()=>start({silent:true,from:ended?0:timeNow()}));
 $('#audioFile').addEventListener('change',async e=>{const file=e.target.files?.[0];if(!file)return;try{await soundtrack.importFile(file);await start({skipLoad:true});}catch(error){audioError(error);}});
 function updateRecordingUI(time=timeNow()){
+ $('#look').disabled=!renderer.setLook||recording||recordPreparing;$('#adaptive').disabled=!renderer.setAdaptiveEnabled||recording||recordPreparing;
  const locked=recording||recordPreparing||!!finishingRecording;
  document.body.classList.toggle('recording',locked);
  for(const id of ['recordFilm','scrub','restart','quality','chaptersButton','audioFile'])$('#'+id).disabled=locked;
@@ -193,7 +210,7 @@ async function startRecording({from=0,to=DURATION}={}){
  if(recording||recordPreparing||finishingRecording)return;
  if(!Number.isFinite(from)||!Number.isFinite(to)||from<0||from>=to||to>DURATION)throw new RangeError('Invalid recording range.');
  const activation=soundtrack.unlock(); // Must remain in the original trusted tap.
- recordPreparing=true;recorder.lastError=null;updateRecordingUI();++startRequest;pause();
+ renderer.captureLocked=true;recordPreparing=true;recorder.lastError=null;updateRecordingUI();++startRequest;pause();
  try{
   await activation;await soundtrack.load();
   if(!renderer.ready||document.hidden)throw new Error('Keep the film tab visible while preparing the recording.');
@@ -204,7 +221,7 @@ async function startRecording({from=0,to=DURATION}={}){
   const done=recorder.start();recording=true;
   done.catch(error=>{
    if(finishingRecording)return;
-   recording=false;pause();updateRecordingUI();
+   recording=false;renderer.captureLocked=false;pause();updateRecordingUI();
    $('#loadStatus').textContent=error.message;
   });
   await paint(from,{force:true}); // Prime video before awaiting encoder readiness.
@@ -217,7 +234,7 @@ async function startRecording({from=0,to=DURATION}={}){
   document.body.classList.add('playing');$('#credits').close();revealControls();updateSoundControl();
  }catch(error){
   recorder.fail(error);recording=false;pause();
- }finally{recordPreparing=false;updateRecordingUI();}
+ }finally{recordPreparing=false;if(!recording)renderer.captureLocked=false;updateRecordingUI();}
 }
 async function seekForRecording(time){
  pendingFrame=null;await paintComplete;
@@ -234,7 +251,7 @@ async function stopRecording(){
    // Best effort automatic download plus a persistent, user-gesture download.
    try{recorder.download();}catch{}return blob;
   }catch(error){$('#loadStatus').textContent=error.message;return null;}
-  finally{renderer.releaseCapture?.();finishingRecording=null;updateRecordingUI();revealControls();}
+  finally{renderer.captureLocked=false;renderer.releaseCapture?.();finishingRecording=null;updateRecordingUI();revealControls();}
  })();updateRecordingUI();return finishingRecording;
 }
 $('#recordFilm').addEventListener('click',()=>startRecording());
@@ -262,6 +279,7 @@ const ready=(async()=>{
  try {
   await renderer.init();await document.fonts.ready;
   $('#backend').textContent=renderer.backend?'WEBGL2 COMPATIBILITY':'NATIVE WEBGPU';
+  $('#cinematicStatus').textContent=renderer.backend?'Compatibility mode retains its lightweight original post stack. Advanced optics require WebGPU.':'HDR optics, half-resolution shafts, energy fields and adaptive scene quality. Output size remains fixed while adaptive quality changes.';
   if(params.has('capture'))document.body.classList.add('capture-mode');
   if(params.has('time')){started=true;$('#gate').hidden=true;manualTime=clamp(Number(params.get('time')),0,DURATION);await paint(manualTime,{force:true});}
   else await paint(82.0,{force:true,poster:true});

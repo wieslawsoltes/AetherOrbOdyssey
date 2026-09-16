@@ -1,28 +1,30 @@
 import { cameraBasis } from './director.js';
+import {CINEMA_QUALITIES,CINEMA_LOOKS,AdaptiveQuality,evenSize} from './rendering/quality.js';
+import {GpuTimer} from './rendering/gpu-timer.js';
+import {CinematicPipeline} from './rendering/cinematic-pipeline.js';
 
-const QUALITIES = {
-  preview: {pixels:580_000,steps:20,particles:4096},
-  balanced: {pixels:1_300_000,steps:32,particles:12288},
-  cinema: {pixels:2_100_000,steps:46,particles:24576},
-  ultra: {pixels:8_300_000,steps:52,particles:32768}
-};
+const QUALITIES=CINEMA_QUALITIES;
 const HDR='rgba16float';
-const load=async name=>{const r=await fetch(new URL(`../shaders/${name}.wgsl`,import.meta.url));if(!r.ok)throw new Error(`Shader ${name}: HTTP ${r.status}`);return r.text();};
+const load=async name=>{const r=await fetch(new URL(`../shaders/${name}.wgsl?v=cinema-1`,import.meta.url));if(!r.ok)throw new Error(`Shader ${name}: HTTP ${r.status}`);return r.text();};
 
 /** Native WebGPU: analytic 3D ray tracing → compute particles → 4-level HDR bloom → film grade. */
 export class FilmRenderer extends EventTarget {
-  constructor(canvas,{quality='balanced'}={}) {
+  constructor(canvas,{quality='balanced',look='cinematic',adaptive=true}={}) {
     super();this.canvas=canvas;this.quality=quality in QUALITIES?quality:'balanced';
     this.values=new Float32Array(32);this.postValues=new Float32Array(8);
-    this.resources=[];this.ready=false;this.frames=0;this.gpuMs=0;this.errors=[];
+    this.ready=false;this.frames=0;this.gpuMs=0;this.errors=[];
+    this.look=look in CINEMA_LOOKS?look:'cinematic';this.adaptiveEnabled=adaptive;
+    this.adaptive=new AdaptiveQuality();this.inFlight=0;this.maxInFlight=2;this.skippedFrames=0;
+    this.cpuMs=0;this.completionMs=0;this.disposed=false;this.captureLocked=false;
+    this.frameContext={film:null,outputView:null,timing:null};
   }
   async init() {
     if(!navigator.gpu)throw new Error('WebGPU is not available. Open this page on HTTPS or localhost in a WebGPU-capable browser.');
     const adapter=await navigator.gpu.requestAdapter({powerPreference:'high-performance'});
     if(!adapter)throw new Error('No WebGPU adapter was returned. Check hardware acceleration in the browser settings.');
-    this.adapterInfo={...adapter.info};
-    this.device=await adapter.requestDevice();this.device.label='Aether Odyssey GPU';
-    this.device.lost.then(info=>{this.ready=false;this.dispatchEvent(new CustomEvent('lost',{detail:info.message||'GPU device lost.'}));});
+    this.adapter=adapter;this.adapterInfo={vendor:adapter.info.vendor,architecture:adapter.info.architecture,device:adapter.info.device,description:adapter.info.description};
+    this.device=await adapter.requestDevice({requiredFeatures:adapter.features.has('timestamp-query')?['timestamp-query']:[]});this.device.label='Aether Odyssey GPU';
+    this.device.lost.then(info=>{if(this.disposed)return;this.ready=false;this.dispatchEvent(new CustomEvent('lost',{detail:info.message||'GPU device lost.'}));});
     this.device.addEventListener('uncapturederror',e=>{this.errors.push(e.error.message);console.error(e.error.message);this.dispatchEvent(new CustomEvent('error',{detail:e.error.message}));});
     this.context=this.canvas.getContext('webgpu');
     if(!this.context)throw new Error('Cannot create a WebGPU canvas context.');
@@ -31,18 +33,19 @@ export class FilmRenderer extends EventTarget {
       usage:GPUTextureUsage.RENDER_ATTACHMENT|GPUTextureUsage.COPY_SRC});
     this.requiresReadback=true;
     const d=this.device;
-    const [common,scene,particles,post]=await Promise.all(['common','scene','particles','post'].map(load));
+    const [common,scene,particles,post,fog]=await Promise.all(['common','scene','particles','cinematic-post','volumetric'].map(load));
     const particleRead=particles.slice(0,particles.indexOf('@compute')).replace('read_write','read')+particles.slice(particles.indexOf('struct ParticleVertex'));
     const modules=await Promise.all([
       this.module(common+scene,'3D ray tracing / glass / metal / atmosphere'),
       this.module(common+particles.slice(0,particles.indexOf('struct ParticleVertex')),'Deterministic orbital particle compute'),
       this.module(common+particleRead,'HDR particle rasterization'),
-      this.module(post,'Bloom and film grade')
+      this.module(post,'Cinematic bloom, anamorphic glare and film grade'),
+      this.module(common+fog,'Depth-aware half-resolution volumetrics')
     ]);
     this.uniform=d.createBuffer({label:'Film camera uniforms',size:128,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST});
     this.sampler=d.createSampler({magFilter:'linear',minFilter:'linear',addressModeU:'clamp-to-edge',addressModeV:'clamp-to-edge'});
     this.engraving=await this.makeEngraving();
-    const commonLayout=d.createBindGroupLayout({entries:[
+    const commonLayout=this.commonLayout=d.createBindGroupLayout({entries:[
       {binding:0,visibility:GPUShaderStage.VERTEX|GPUShaderStage.FRAGMENT|GPUShaderStage.COMPUTE,buffer:{type:'uniform'}},
       {binding:1,visibility:GPUShaderStage.FRAGMENT,texture:{}},
       {binding:2,visibility:GPUShaderStage.FRAGMENT,sampler:{}}
@@ -59,14 +62,8 @@ export class FilmRenderer extends EventTarget {
     this.scenePipeline=await d.createRenderPipelineAsync({label:'Analytic world',layout:d.createPipelineLayout({bindGroupLayouts:[commonLayout]}),vertex:{module:modules[0],entryPoint:'fullscreen'},fragment:{module:modules[0],entryPoint:'sceneFragment',targets},primitive:{topology:'triangle-list'}});
     this.computePipeline=await d.createComputePipelineAsync({label:'Orbit integration at absolute film time',layout:d.createPipelineLayout({bindGroupLayouts:[commonLayout,writable]}),compute:{module:modules[1],entryPoint:'simulate'}});
     this.particlePipeline=await d.createRenderPipelineAsync({label:'Additive particle billboards',layout:d.createPipelineLayout({bindGroupLayouts:[commonLayout,readable]}),vertex:{module:modules[2],entryPoint:'particleVertex'},fragment:{module:modules[2],entryPoint:'particleFragment',targets:[{format:HDR,blend:{color:{srcFactor:'one',dstFactor:'one',operation:'add'},alpha:{srcFactor:'zero',dstFactor:'one',operation:'add'}}}]},primitive:{topology:'triangle-list'}});
-    const entries=[{binding:0,visibility:GPUShaderStage.FRAGMENT,texture:{}},{binding:1,visibility:GPUShaderStage.FRAGMENT,sampler:{}},{binding:2,visibility:GPUShaderStage.FRAGMENT,buffer:{type:'uniform'}}];
-    this.postLayout=d.createBindGroupLayout({entries});
-    this.finalLayout=d.createBindGroupLayout({entries:[...entries,...[3,4,5,6].map(binding=>({binding,visibility:GPUShaderStage.FRAGMENT,texture:{}}))]});
-    const postDesc=(entry,layout,format)=>({layout:d.createPipelineLayout({bindGroupLayouts:[layout]}),vertex:{module:modules[3],entryPoint:'vs'},fragment:{module:modules[3],entryPoint:entry,targets:[{format}]},primitive:{topology:'triangle-list'}});
-    [this.downPipeline,this.blurPipeline,this.finalPipeline]=await Promise.all([
-      d.createRenderPipelineAsync(postDesc('down',this.postLayout,HDR)),d.createRenderPipelineAsync(postDesc('blur',this.postLayout,HDR)),d.createRenderPipelineAsync(postDesc('finish',this.finalLayout,this.format))
-    ]);
-    this.finalUniform=d.createBuffer({size:32,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST});
+    this.timer=new GpuTimer(d,ms=>{this.gpuMs=this.gpuMs?this.gpuMs*.8+ms*.2:ms;});
+    this.cinematic=new CinematicPipeline(this);await this.cinematic.init(modules[3],modules[4]);
     this.ready=true;this.resize();return this;
   }
   async module(code,label) {
@@ -85,97 +82,90 @@ export class FilmRenderer extends EventTarget {
     const texture=this.device.createTexture({label:'Engraved wordmark',size:[1024,128],format:'rgba8unorm',usage:GPUTextureUsage.TEXTURE_BINDING|GPUTextureUsage.COPY_DST|GPUTextureUsage.RENDER_ATTACHMENT});
     this.device.queue.copyExternalImageToTexture({source:c},{texture},[1024,128]);return texture;
   }
-  setQuality(quality) {if(!(quality in QUALITIES))throw new Error(`Unknown quality: ${quality}`);this.quality=quality;this.resize(true);}
-  texture(w,h,label) {
-    const t=this.device.createTexture({label,size:[w,h],format:HDR,usage:GPUTextureUsage.RENDER_ATTACHMENT|GPUTextureUsage.TEXTURE_BINDING});this.resources.push(t);return t;
+  setQuality(quality){
+    if(!(quality in QUALITIES))throw new Error(`Unknown quality: ${quality}`);
+    this.quality=quality;this.adaptive.reset();this.resize(true);
   }
-  makePostGroup(texture,values) {
-    const buffer=this.device.createBuffer({size:32,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST});
-    this.device.queue.writeBuffer(buffer,0,new Float32Array(values));this.resources.push(buffer);
-    return this.device.createBindGroup({layout:this.postLayout,entries:[{binding:0,resource:texture.createView()},{binding:1,resource:this.sampler},{binding:2,resource:{buffer}}]});
-  }
-  resize(force=false,width=0,height=0) {
+  setLook(look){if(!(look in CINEMA_LOOKS))throw new Error(`Unknown cinematic look: ${look}`);this.look=look;this.resize(true);}
+  setAdaptiveEnabled(value){this.adaptiveEnabled=!!value;this.adaptive.reset();}
+  get canSubmit(){return this.inFlight<this.maxInFlight;}
+  resize(force=false,width=0,height=0){
     if(!this.ready)return;
-    const rect=this.canvas.getBoundingClientRect();const dpr=Math.min(devicePixelRatio||1,2);
-    let w=Math.round(width||rect.width*dpr),h=Math.round(height||rect.height*dpr);
-    if(w<2||h<2)return;
-    const max=this.device.limits.maxTextureDimension2D;
-    let scale=Math.min(1,Math.sqrt(QUALITIES[this.quality].pixels/(w*h)),max/w,max/h);
-    if(width&&height)scale=Math.min(1,max/w,max/h);
-    w=Math.max(2,Math.round(w*scale/2)*2);h=Math.max(2,Math.round(h*scale/2)*2);
-    if(!force&&this.width===w&&this.height===h)return;
-    for(const resource of this.resources)resource.destroy();this.resources=[];
-    this.width=this.canvas.width=w;this.height=this.canvas.height=h;
-    this.hdr=this.texture(w,h,'Full HDR scene');this.hdrView=this.hdr.createView();
-    this.bloom=[];let prev=this.hdr;this.passes=[];
-    for(let i=0;i<4;i++) {
-      const bw=Math.max(2,w>>(i+1)),bh=Math.max(2,h>>(i+1));
-      const a=this.texture(bw,bh,`Bloom ${i} / vertical`),b=this.texture(bw,bh,`Bloom ${i} / horizontal`);
-      this.passes.push({pipeline:this.downPipeline,group:this.makePostGroup(prev,[bw,bh,0,0,i===0?1:0,0,0,0]),view:a.createView()});
-      this.passes.push({pipeline:this.blurPipeline,group:this.makePostGroup(a,[bw,bh,1,0,0,0,0,0]),view:b.createView()});
-      this.passes.push({pipeline:this.blurPipeline,group:this.makePostGroup(b,[bw,bh,0,1,0,0,0,0]),view:a.createView()});
-      this.bloom.push(a);prev=a;
-    }
-    this.finalGroup=this.device.createBindGroup({layout:this.finalLayout,entries:[
-      {binding:0,resource:this.hdrView},{binding:1,resource:this.sampler},{binding:2,resource:{buffer:this.finalUniform}},
-      ...this.bloom.map((t,i)=>({binding:i+3,resource:t.createView()}))
-    ]});
+    const rect=this.canvas.getBoundingClientRect(),dpr=Math.min(globalThis.devicePixelRatio||1,2);
+    const ow=width||rect.width*dpr,oh=height||rect.height*dpr;if(ow<2||oh<2)return;
+    const q=QUALITIES[this.quality],limit=this.device.limits.maxTextureDimension2D;
+    const scale=width&&height?1:Math.min(1,Math.sqrt(q.pixels/(ow*oh)));
+    const [w,h]=evenSize(ow,oh,scale,limit);
+    if(w!==this.width||h!==this.height){this.width=this.canvas.width=w;this.height=this.canvas.height=h;this.releaseCapture();}
+    this.resizeScene(1);
   }
-  drawPass(encoder,pipeline,group,view,label='Post process') {
-    const pass=encoder.beginRenderPass({label,colorAttachments:[{view,loadOp:'clear',storeOp:'store',clearValue:{r:0,g:0,b:0,a:1}}]});
-    pass.setPipeline(pipeline);pass.setBindGroup(0,group);pass.draw(3);pass.end();
+  resizeScene(scale){
+    const q=QUALITIES[this.quality];const [w,h]=evenSize(this.width,this.height,q.sceneScale*scale);
+    this.sceneWidth=w;this.sceneHeight=h;
+    this.cinematic.resize(this.width,this.height,w,h,q,CINEMA_LOOKS[this.look]);
   }
-  async render(film,{audioEnergy=0,wait=false,capture=false}={}) {
-    if(!this.ready)return;
-    const start=performance.now();const {forward,right,up}=cameraBasis(film.camera,film.target);const q=QUALITIES[this.quality];
-    this.values.set([this.width,this.height,film.time,this.width/this.height],0);
-    this.values.set([...film.camera,Math.tan(film.fov*Math.PI/360)],4);
-    this.values.set([...right,film.world],8);this.values.set([...up,film.energy*(1+Math.min(.12,audioEnergy*.12))],12);
-    this.values.set([...forward,film.explode],16);
-    this.values.set([film.sun,film.fade,q.steps,audioEnergy],20);
-    this.values.set([0,.47+film.explode*1.44,0,1.15],24);
-    this.values.set([1,0,0,0],28);
-    this.device.queue.writeBuffer(this.uniform,0,this.values);
-    this.postValues.set([this.width,this.height,0,0,0,film.fade,film.time,0]);
-    this.device.queue.writeBuffer(this.finalUniform,0,this.postValues);
-    const enc=this.device.createCommandEncoder({label:`Film ${film.time.toFixed(3)}`});
-    if(film.world>.5){const cp=enc.beginComputePass({label:'Time-addressable particle field'});cp.setPipeline(this.computePipeline);cp.setBindGroup(0,this.commonGroup);cp.setBindGroup(1,this.computeGroup);cp.dispatchWorkgroups(Math.ceil(q.particles/128));cp.end();}
-    this.drawPass(enc,this.scenePipeline,this.commonGroup,this.hdrView,'Ray-trace analytic world');
-    if(film.world>.5) {
-      const pass=enc.beginRenderPass({label:'Luminous orbital particles',colorAttachments:[{view:this.hdrView,loadOp:'load',storeOp:'store'}]});
-      pass.setPipeline(this.particlePipeline);pass.setBindGroup(0,this.commonGroup);pass.setBindGroup(1,this.particleGroup);pass.draw(6,q.particles);pass.end();
-    }
-    for(const p of this.passes)this.drawPass(enc,p.pipeline,p.group,p.view);
-    // Copy the SAME swapchain texture in the SAME submission, before presentation.
-    // Awaiting onSubmittedWorkDone and then drawImage(canvas) can read a recycled
-    // WebGPU drawing buffer. COPY_SRC + mapped readback has an explicit lifetime.
-    const output=this.context.getCurrentTexture();
-    this.drawPass(enc,this.finalPipeline,this.finalGroup,output.createView(),'Tone mapping / fine grain');
+  async render(film,{audioEnergy=0,wait=false,capture=false,adaptive=false}={}){
+    if(!this.ready)return null;
+    if(!wait&&!capture&&!this.canSubmit){this.skippedFrames++;return null;}
+    const begin=performance.now();const q=QUALITIES[this.quality],look=CINEMA_LOOKS[this.look];
+    const scalable=adaptive&&this.adaptiveEnabled&&!capture&&!this.captureLocked;
+    const scale=scalable?this.adaptive.scale:1;
+    this.resizeScene(scale);
+    const basis=cameraBasis(film.camera,film.target),{forward,right,up}=basis;
+    // Fixed arrays are reused. Internal rendering and native presentation are independent.
+    const v=this.values;v[0]=this.sceneWidth;v[1]=this.sceneHeight;v[2]=film.time;v[3]=this.width/this.height;
+    v.set(film.camera,4);v[7]=Math.tan(film.fov*Math.PI/360);
+    v.set(right,8);v[11]=film.world;v.set(up,12);v[15]=film.energy*(1+Math.min(.12,audioEnergy*.12));
+    v.set(forward,16);v[19]=film.explode;
+    v[20]=film.sun;v[21]=film.fade;v[22]=Math.max(12,Math.round(q.steps*(.72+.28*scale)));v[23]=audioEnergy;
+    v[24]=0;v[25]=.47+film.explode*1.44;v[26]=0;v[27]=1.15;
+    this.activeParticles=Math.max(128,Math.floor(q.particles*(.5+.5*scale)/128)*128);
+    v[28]=scale;v[29]=look.intensity;v[30]=Math.max(6,Math.round(q.fogSteps*scale));v[31]=this.activeParticles;
+    this.device.queue.writeBuffer(this.uniform,0,v);this.cinematic.update(film,look,basis);
+    const enc=this.device.createCommandEncoder({label:'Cinematic film frame'});
+    const output=this.context.getCurrentTexture();const f=this.frameContext;
+    f.film=film;f.outputView=output.createView();f.timing=this.timer.begin(this.frames);
+    this.cinematic.encode(enc,f);
     let readback=null;
     if(capture){
       const layout=readbackLayout(this.width,this.height);
       if(!this.captureBuffer||this.captureBuffer.size!==layout.size){
-        this.releaseCapture();
-        this.captureBuffer=this.device.createBuffer({label:'Recording RGBA readback',size:layout.size,
-          usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ});
+        this.releaseCapture();this.captureBuffer=this.device.createBuffer({label:'Recording RGBA readback',size:layout.size,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ});
       }
       readback=this.captureBuffer;
       enc.copyTextureToBuffer({texture:output},{buffer:readback,bytesPerRow:layout.bytesPerRow},[this.width,this.height]);
     }
-    this.device.queue.submit([enc.finish()]);this.frames++;
-    let image=null;
+    const timing=f.timing;this.timer.resolve(enc,timing);
+    this.device.queue.submit([enc.finish()]);this.frames++;this.inFlight++;
+    const submissionEnd=performance.now();this.cpuMs=this.cpuMs*.9+(submissionEnd-begin)*.1;
+    this.timer.collect(timing);
+    // A fence releases backpressure asynchronously; playback does NOT await it.
+    const completed=this.device.queue.onSubmittedWorkDone();
+    completed.then(()=>{
+      const ms=performance.now()-submissionEnd;this.completionMs=this.completionMs*.9+ms*.1;
+      if(!this.timer.enabled)this.gpuMs=this.completionMs;
+      if(!this.disposed)this.adaptive.observe(this.timer.samples?this.gpuMs:ms,performance.now(),{locked:!scalable||this.captureLocked});
+    }).catch(()=>{}).finally(()=>{this.inFlight=Math.max(0,this.inFlight-1);});
     if(readback){
       await readback.mapAsync(GPUMapMode.READ);
-      try{
-        const data=unpackCapturePixels(new Uint8Array(readback.getMappedRange()),this.width,this.height,this.format);
-        image=new ImageData(data,this.width,this.height);
-      }finally{readback.unmap();}
-    }else if(wait){await this.device.queue.onSubmittedWorkDone();}
-    if(wait||capture)this.gpuMs=this.gpuMs*.9+(performance.now()-start)*.1;
-    return image;
+      try{return new ImageData(unpackCapturePixels(new Uint8Array(readback.getMappedRange()),this.width,this.height,this.format),this.width,this.height);}
+      finally{readback.unmap();}
+    }
+    if(wait)await completed;
+    return null;
   }
+  get diagnostics(){return {
+    engine:'Cinematic WebGPU 3',output:[this.width,this.height],internal:[this.sceneWidth,this.sceneHeight],
+    quality:this.quality,look:this.look,adaptiveEnabled:this.adaptiveEnabled,adaptiveScale:this.adaptive.scale,
+    inFlight:this.inFlight,maxInFlight:this.maxInFlight,skippedFrames:this.skippedFrames,
+    cpuSubmissionMs:this.cpuMs,completionLatencyMs:this.completionMs,
+    gpuTimestampMs:this.timer?.enabled?this.gpuMs:null,timestampSamples:this.timer?.samples||0,
+    particles:this.activeParticles,...this.cinematic?.diagnostics};}
   releaseCapture(){this.captureBuffer?.destroy();this.captureBuffer=null;}
-  dispose(){this.releaseCapture();this.ready=false;for(const r of this.resources)r.destroy();this.uniform?.destroy();this.finalUniform?.destroy();this.particleBuffer?.destroy();this.engraving?.destroy();this.context?.unconfigure();this.device?.destroy();}
+  dispose(){
+    if(this.disposed)return;this.disposed=true;this.ready=false;this.releaseCapture();this.timer?.dispose();this.cinematic?.dispose();
+    this.uniform?.destroy();this.particleBuffer?.destroy();this.engraving?.destroy();this.context?.unconfigure();this.device?.destroy();
+  }
 }
 
 /** Texture-to-buffer rows must be 256-byte aligned; dimensions need not be. */

@@ -8,7 +8,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SKIP_DIRS = {'.git', '_site', '__pycache__', 'node_modules', 'capture', '.pytest_cache'}
-SKIP_NAMES = {'MANIFEST.json', '.DS_Store', 'zarathustra.ogg'}
+SKIP_NAMES = {'MANIFEST.json', '.DS_Store', 'zarathustra.ogg', 'zarathustra.mp3'}
 
 def inventory(root: Path = ROOT) -> dict:
     files = {}

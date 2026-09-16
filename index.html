@@ -5,7 +5,7 @@
 <meta name="theme-color" content="#05060a">
 <meta name="description" content="Aether Orb. A cinematic real-time WebGPU concept film by CrystalBall. Music: Richard Strauss, performed by Kevin MacLeod.">
 <title>Aether Orb — Odyssey / CrystalBall</title>
-<link rel="stylesheet" href="style.css?v=recording-3">
+<link rel="stylesheet" href="style.css?v=cinema-1">
 </head>
 <body>
 <main id="stage" aria-label="Aether Orb cinematic product film">
@@ -56,10 +56,19 @@
  </aside>
  <div id="fatal" class="fatal" role="alert" hidden><p class="eyebrow">RENDERER STATUS</p><h2>WebGPU needs your attention.</h2><p id="fatalText"></p><p>Serve the folder with <code>python3 tools/serve.py</code> and open <code>http://localhost:8080</code>. Use a browser with WebGPU and hardware acceleration enabled.</p><button onclick="location.reload()">Retry</button> <button onclick="const u=new URL(location.href);u.searchParams.set('compat','1');location.href=u">WebGL2 compatibility</button></div>
 </main>
+<pre id="performanceHUD" hidden aria-hidden="true"></pre>
 <dialog id="credits">
  <form method="dialog"><button class="dialog-close" aria-label="Close credits">×</button></form>
  <p class="eyebrow">FILM NOTES & CREDITS</p><h2>Aether Orb<br>Odyssey.</h2>
  <p>A real-time concept film. All geometry, light, glass, atmosphere, particles and camera motion are rendered live. The exploded assembly is a design visualization, not a verified production assembly.</p>
+ <h3>Cinematic rendering</h3>
+ <div class="cinema-settings">
+  <label for="look">Optical treatment</label>
+  <select id="look"><option value="clean">Clean / restrained</option><option value="cinematic" selected>Cinematic</option><option value="odyssey">Odyssey / dramatic</option></select>
+  <label class="toggle-setting"><input id="adaptive" type="checkbox" checked> Adaptive performance</label>
+  <label class="toggle-setting"><input id="perfStats" type="checkbox"> Show rendering statistics</label>
+ </div>
+ <p id="cinematicStatus" class="muted"></p>
  <h3>Music</h3><p><em>Also Sprach Zarathustra — Einleitung</em><br>Composition: Richard Strauss.<br>Recording: Kevin MacLeod.</p>
  <p>Used under <a href="https://creativecommons.org/licenses/by/3.0/" target="_blank" rel="noopener noreferrer">Creative Commons Attribution 3.0</a>. <a href="https://commons.wikimedia.org/wiki/File:Also_Sprach_Zarathustra_-_Einleitung.ogg" target="_blank" rel="noopener noreferrer">Recording and source</a>. Synchronized to the animation; playback volume adjusted. An MP3 compatibility copy is transcoded from the credited Ogg recording. This is not the film soundtrack master and no endorsement is implied.</p>
  <p class="muted">The score loads from the local assets folder when present, otherwise from Wikimedia Commons, and is cached when the browser allows it. Locally selected replacement audio is never uploaded. The source and license above apply to the default recording only; update credits and obtain any necessary rights for replacement audio.</p>
@@ -70,5 +79,5 @@
  <p class="muted">Space: play/pause · ← / →: seek · R: replay · M: mute · F: fullscreen · C: credits.</p>
  <details><summary>Renderer diagnostics</summary><pre id="diagnostics"></pre></details>
 </dialog>
-<script type="module" src="src/app.js?v=recording-3"></script>
+<script type="module" src="src/app.js?v=cinema-1"></script>
 </body></html>

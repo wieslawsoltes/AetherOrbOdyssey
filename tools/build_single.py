@@ -6,7 +6,7 @@ def main():
     shaders={p.stem:p.read_text() for p in sorted((ROOT/'shaders').glob('*.wgsl'))}
     code='const INLINE_SHADERS='+json.dumps(shaders,separators=(',',':'))+';\n'
     code+='const INLINE_COMPAT='+json.dumps((ROOT/'shaders/compat-scene.glsl').read_text())+';\n'
-    for filename in ['director.js','renderer.js','compatibility.js','audio.js','export.js','app.js']:
+    for filename in ['rendering/quality.js','rendering/target-pool.js','rendering/frame-graph.js','rendering/gpu-timer.js','rendering/cinematic-pipeline.js','director.js','renderer.js','compatibility.js','audio.js','export.js','app.js']:
         source=(ROOT/'src'/filename).read_text()
         source=re.sub(r'^import .*?;\n','',source,flags=re.MULTILINE)
         source=re.sub(r'^export ','',source,flags=re.MULTILINE)

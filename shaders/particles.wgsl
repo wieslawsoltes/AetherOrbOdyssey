@@ -1,7 +1,7 @@
 struct Particle {position:vec4f,color:vec4f};
 @group(1) @binding(0) var<storage,read_write> outputParticles:array<Particle>;
 @compute @workgroup_size(128) fn simulate(@builtin(global_invocation_id) id:vec3u){
- let i=id.x;if(i>=arrayLength(&outputParticles)){return;}
+ let i=id.x;if(i>=min(arrayLength(&outputParticles),u32(u.extra.w))){return;}
  let f=f32(i);let h=hash11(f*.871+3.12);let h2=hash11(f*2.131+9.4);let h3=hash11(f*.12+7.9);
  let t=u.resolution.z;let arm=f32(i%5u);let a=h*PI*2.0+t*(.14+h2*.09);
  let r=.23+h2*.61;let tube=.038*(h3-.5);
@@ -9,9 +9,16 @@ struct Particle {position:vec4f,color:vec4f};
  p=rotateX(rotateZ(p,arm*.63+.24),arm*.74+.40);
  p+=vec3f(sin(a*5+f)*tube,cos(a*4+f)*tube,0);
  let fade=(.26+.74*pow(.5+.5*sin(a*3-t*.41),4.0));
- let size=mix(.0009,.0033,pow(h3,7.0));
+ var size=mix(.0009,.0033,pow(h3,7.0));
+ var tint=mix(vec3f(.12,.55,1.0),vec3f(.71,.33,1.0),h2);var opacity=fade*(.5+h3)*u.up.w;
+ // An interleaved sparse population gives genuine near-field camera parallax.
+ if(i%16u==0u && u.extra.y>0.0){
+  p=vec3f((h-.5)*6.0,(h2-.20)*3.2,(h3-.5)*6.0);
+  p+=vec3f(sin(t*.11+f)*.035,cos(t*.09+f)*.035,0);size=.002+h3*.003;
+  tint=mix(vec3f(.21,.46,.85),vec3f(.90,.56,.25),h);opacity=.12*u.extra.y;
+ }
  outputParticles[i].position=vec4f(u.orb.xyz+p*u.orb.w,size);
- outputParticles[i].color=vec4f(mix(vec3f(.12,.55,1.0),vec3f(.71,.33,1.0),h2),fade*(.5+h3)*u.up.w);
+ outputParticles[i].color=vec4f(tint,opacity);
 }
 struct ParticleVertex{@builtin(position) position:vec4f,@location(0) uv:vec2f,@location(1) color:vec4f};
 @vertex fn particleVertex(@builtin(vertex_index) vi:u32,@builtin(instance_index) instance:u32)->ParticleVertex{

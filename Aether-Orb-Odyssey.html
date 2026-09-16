@@ -22,6 +22,15 @@
 .record-hud [role=status]{max-width:min(600px,70vw);overflow-wrap:anywhere}
 .capture-mode .record-hud{display:none!important}
 
+/* Cinematic settings: controls stay outside the captured film. */
+.cinema-settings{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:center;margin:18px 0}
+.cinema-settings select{width:100%;background:#101522;color:#e4eafa;border:1px solid #303b52;border-radius:8px;padding:10px;font:inherit}
+.cinema-settings .toggle-setting{grid-column:1/-1;display:flex;align-items:center;gap:10px;font-size:13px}
+.cinema-settings input{accent-color:#92baff;width:17px;height:17px}
+#performanceHUD{position:fixed;left:24px;top:72px;z-index:12;pointer-events:none;padding:12px 15px;border:1px solid #ffffff20;background:#060b14bc;color:#b4cce9;border-radius:8px;font:11px/1.6 ui-monospace,monospace;backdrop-filter:blur(10px)}
+.capture-mode #performanceHUD,.recording #performanceHUD{display:none!important}
+@media(max-width:580px){.cinema-settings{grid-template-columns:1fr}#performanceHUD{top:58px;left:12px;font-size:9px}}
+
 </style>
 </head>
 <body>
@@ -73,10 +82,19 @@
  </aside>
  <div id="fatal" class="fatal" role="alert" hidden><p class="eyebrow">RENDERER STATUS</p><h2>WebGPU needs your attention.</h2><p id="fatalText"></p><p>Serve the folder with <code>python3 tools/serve.py</code> and open <code>http://localhost:8080</code>. Use a browser with WebGPU and hardware acceleration enabled.</p><button onclick="location.reload()">Retry</button> <button onclick="const u=new URL(location.href);u.searchParams.set('compat','1');location.href=u">WebGL2 compatibility</button></div>
 </main>
+<pre id="performanceHUD" hidden aria-hidden="true"></pre>
 <dialog id="credits">
  <form method="dialog"><button class="dialog-close" aria-label="Close credits">×</button></form>
  <p class="eyebrow">FILM NOTES & CREDITS</p><h2>Aether Orb<br>Odyssey.</h2>
  <p>A real-time concept film. All geometry, light, glass, atmosphere, particles and camera motion are rendered live. The exploded assembly is a design visualization, not a verified production assembly.</p>
+ <h3>Cinematic rendering</h3>
+ <div class="cinema-settings">
+  <label for="look">Optical treatment</label>
+  <select id="look"><option value="clean">Clean / restrained</option><option value="cinematic" selected>Cinematic</option><option value="odyssey">Odyssey / dramatic</option></select>
+  <label class="toggle-setting"><input id="adaptive" type="checkbox" checked> Adaptive performance</label>
+  <label class="toggle-setting"><input id="perfStats" type="checkbox"> Show rendering statistics</label>
+ </div>
+ <p id="cinematicStatus" class="muted"></p>
  <h3>Music</h3><p><em>Also Sprach Zarathustra — Einleitung</em><br>Composition: Richard Strauss.<br>Recording: Kevin MacLeod.</p>
  <p>Used under <a href="https://creativecommons.org/licenses/by/3.0/" target="_blank" rel="noopener noreferrer">Creative Commons Attribution 3.0</a>. <a href="https://commons.wikimedia.org/wiki/File:Also_Sprach_Zarathustra_-_Einleitung.ogg" target="_blank" rel="noopener noreferrer">Recording and source</a>. Synchronized to the animation; playback volume adjusted. An MP3 compatibility copy is transcoded from the credited Ogg recording. This is not the film soundtrack master and no endorsement is implied.</p>
  <p class="muted">The score loads from the local assets folder when present, otherwise from Wikimedia Commons, and is cached when the browser allows it. Locally selected replacement audio is never uploaded. The source and license above apply to the default recording only; update credits and obtain any necessary rights for replacement audio.</p>
@@ -88,8 +106,242 @@
  <details><summary>Renderer diagnostics</summary><pre id="diagnostics"></pre></details>
 </dialog>
 <script type="module">
-const INLINE_SHADERS={"common":"struct Uniforms {\n resolution: vec4f, // width, height, film seconds, aspect\n camera: vec4f, // xyz, tangent of half vertical field of view\n right: vec4f, // xyz, world: 0 dawn, 1 studio, 2 interior\n up: vec4f, // xyz, energy\n forward: vec4f, // xyz, exploded amount\n parameters: vec4f, // sunrise, film fade, volume steps, audio energy\n orb: vec4f, // xyz centre, radius\n extra: vec4f // render scale, reserved\n};\n@group(0) @binding(0) var<uniform> u: Uniforms;\nconst PI: f32 = 3.14159265359;\nfn saturate(x:f32)->f32{return clamp(x,0.0,1.0);}\nfn hash31(p:vec3f)->f32{var q=fract(p*.1031);q+=vec3f(dot(q,q.yzx+33.33));return fract((q.x+q.y)*q.z);}\nfn hash11(p:f32)->f32{return fract(sin(p*127.1)*43758.5453);}\nfn rotateX(p:vec3f,a:f32)->vec3f{let c=cos(a);let s=sin(a);return vec3f(p.x,c*p.y-s*p.z,s*p.y+c*p.z);}\nfn rotateY(p:vec3f,a:f32)->vec3f{let c=cos(a);let s=sin(a);return vec3f(c*p.x+s*p.z,p.y,-s*p.x+c*p.z);}\nfn rotateZ(p:vec3f,a:f32)->vec3f{let c=cos(a);let s=sin(a);return vec3f(c*p.x-s*p.y,s*p.x+c*p.y,p.z);}\nfn noise3(p:vec3f)->f32{\n let i=floor(p);let f=fract(p);let s=f*f*(3.0-2.0*f);\n return mix(mix(mix(hash31(i),hash31(i+vec3f(1,0,0)),s.x),mix(hash31(i+vec3f(0,1,0)),hash31(i+vec3f(1,1,0)),s.x),s.y),\n mix(mix(hash31(i+vec3f(0,0,1)),hash31(i+vec3f(1,0,1)),s.x),mix(hash31(i+vec3f(0,1,1)),hash31(i+vec3f(1,1,1)),s.x),s.y),s.z);\n}\nfn sphereHit(ro:vec3f,rd:vec3f,center:vec3f,r:f32)->vec2f{\n let q=ro-center;let b=dot(q,rd);let h=b*b-dot(q,q)+r*r;\n if(h<0.0){return vec2f(-1.0);}\n let s=sqrt(h);return vec2f(-b-s,-b+s);\n}\nfn direction(uv:vec2f)->vec3f{\n let q=vec2f(uv.x*2.0-1.0,1.0-uv.y*2.0);\n return normalize(u.forward.xyz+(q.x*u.resolution.w*u.right.xyz+q.y*u.up.xyz)*u.camera.w);\n}\nstruct VertexOut{@builtin(position) position:vec4f,@location(0) uv:vec2f};\n@vertex fn fullscreen(@builtin(vertex_index) i:u32)->VertexOut{\n var p=array<vec2f,3>(vec2f(-1,-1),vec2f(3,-1),vec2f(-1,3));var o:VertexOut;\n o.position=vec4f(p[i],0,1);o.uv=p[i]*vec2f(.5,-.5)+.5;return o;\n}\n","particles":"struct Particle {position:vec4f,color:vec4f};\n@group(1) @binding(0) var<storage,read_write> outputParticles:array<Particle>;\n@compute @workgroup_size(128) fn simulate(@builtin(global_invocation_id) id:vec3u){\n let i=id.x;if(i>=arrayLength(&outputParticles)){return;}\n let f=f32(i);let h=hash11(f*.871+3.12);let h2=hash11(f*2.131+9.4);let h3=hash11(f*.12+7.9);\n let t=u.resolution.z;let arm=f32(i%5u);let a=h*PI*2.0+t*(.14+h2*.09);\n let r=.23+h2*.61;let tube=.038*(h3-.5);\n var p=vec3f(cos(a)*r,tube+sin(a*3+t*.21)*.055,sin(a)*r);\n p=rotateX(rotateZ(p,arm*.63+.24),arm*.74+.40);\n p+=vec3f(sin(a*5+f)*tube,cos(a*4+f)*tube,0);\n let fade=(.26+.74*pow(.5+.5*sin(a*3-t*.41),4.0));\n let size=mix(.0009,.0033,pow(h3,7.0));\n outputParticles[i].position=vec4f(u.orb.xyz+p*u.orb.w,size);\n outputParticles[i].color=vec4f(mix(vec3f(.12,.55,1.0),vec3f(.71,.33,1.0),h2),fade*(.5+h3)*u.up.w);\n}\nstruct ParticleVertex{@builtin(position) position:vec4f,@location(0) uv:vec2f,@location(1) color:vec4f};\n@vertex fn particleVertex(@builtin(vertex_index) vi:u32,@builtin(instance_index) instance:u32)->ParticleVertex{\n var vertices=array<vec2f,6>(vec2f(-1,-1),vec2f(1,-1),vec2f(-1,1),vec2f(-1,1),vec2f(1,-1),vec2f(1,1));\n let p=outputParticles[instance];let d=p.position.xyz-u.camera.xyz;\n let depth=dot(d,u.forward.xyz);let xy=vec2f(dot(d,u.right.xyz)/u.resolution.w,dot(d,u.up.xyz))/u.camera.w;\n let corner=vertices[vi];let sz=p.position.w*2.3;\n var o:ParticleVertex;\n o.position=vec4f(xy+corner*vec2f(sz/u.resolution.w,sz)/u.camera.w,depth*.99,max(depth,.001));\n o.uv=corner;o.color=p.color;\n if(depth<.03||u.right.w<.5){o.position=vec4f(5,5,0,1);}\n return o;\n}\n@fragment fn particleFragment(in:ParticleVertex)->@location(0) vec4f{\n let r=dot(in.uv,in.uv);let glow=exp(-r*4.0)*(1-smoothstep(.55,1.0,r));\n return vec4f(in.color.rgb*in.color.a*glow*.85,0);\n}\n","post":"struct Post { size:vec4f, values:vec4f };\n@group(0) @binding(0) var inputTexture:texture_2d<f32>;\n@group(0) @binding(1) var texSampler:sampler;\n@group(0) @binding(2) var<uniform> post:Post;\nstruct V{@builtin(position) position:vec4f,@location(0) uv:vec2f};\n@vertex fn vs(@builtin(vertex_index) i:u32)->V{\n var p=array<vec2f,3>(vec2f(-1,-1),vec2f(3,-1),vec2f(-1,3));var o:V;o.position=vec4f(p[i],0,1);o.uv=p[i]*vec2f(.5,-.5)+.5;return o;\n}\n@fragment fn down(in:V)->@location(0) vec4f{\n let px=1.0/vec2f(textureDimensions(inputTexture));\n var c=textureSampleLevel(inputTexture,texSampler,in.uv+px*vec2f(-1,-1),0).rgb;\n c+=textureSampleLevel(inputTexture,texSampler,in.uv+px*vec2f(1,-1),0).rgb;\n c+=textureSampleLevel(inputTexture,texSampler,in.uv+px*vec2f(-1,1),0).rgb;\n c+=textureSampleLevel(inputTexture,texSampler,in.uv+px*vec2f(1,1),0).rgb;c*=.25;\n if(post.values.x>.5){let lum=max(max(c.r,c.g),c.b);c*=max(0.0,lum-.80)/max(lum,.001);}\n return vec4f(c,1);\n}\n@fragment fn blur(in:V)->@location(0) vec4f{\n let step=post.size.zw/vec2f(textureDimensions(inputTexture));\n var c=textureSampleLevel(inputTexture,texSampler,in.uv,0).rgb*.227027;\n c+=(textureSampleLevel(inputTexture,texSampler,in.uv+step*1.384615,0).rgb+textureSampleLevel(inputTexture,texSampler,in.uv-step*1.384615,0).rgb)*.316216;\n c+=(textureSampleLevel(inputTexture,texSampler,in.uv+step*3.230769,0).rgb+textureSampleLevel(inputTexture,texSampler,in.uv-step*3.230769,0).rgb)*.070270;\n return vec4f(c,1);\n}\n@group(0) @binding(3) var bloom0:texture_2d<f32>;\n@group(0) @binding(4) var bloom1:texture_2d<f32>;\n@group(0) @binding(5) var bloom2:texture_2d<f32>;\n@group(0) @binding(6) var bloom3:texture_2d<f32>;\nfn aces(c:vec3f)->vec3f{return clamp((c*(2.51*c+.03))/(c*(2.43*c+.59)+.14),vec3f(0),vec3f(1));}\n@fragment fn finish(in:V)->@location(0) vec4f{\n let uv=in.uv;let p=uv-.5;\n let chroma=p*dot(p,p)*.0009;\n var col=vec3f(textureSampleLevel(inputTexture,texSampler,uv+chroma,0).r,textureSampleLevel(inputTexture,texSampler,uv,0).g,textureSampleLevel(inputTexture,texSampler,uv-chroma,0).b);\n col+=textureSampleLevel(bloom0,texSampler,uv,0).rgb*.25;\n col+=textureSampleLevel(bloom1,texSampler,uv,0).rgb*.25;\n col+=textureSampleLevel(bloom2,texSampler,uv,0).rgb*.24;\n col+=textureSampleLevel(bloom3,texSampler,uv,0).rgb*.24;\n let vignette=1.0-dot(p*vec2f(.83,1.0),p*vec2f(.83,1.0))*.55;\n col=aces(col*1.30*vignette)*post.values.y;\n col=pow(col,vec3f(1.0/2.2));\n let hash=fract(sin(dot(floor(uv*post.size.xy),vec2f(12.9898,78.233))+floor(post.values.z*24)*.17)*43758.5453);\n col+=(hash-.5)*.0035;\n return vec4f(max(col,vec3f(0)),1);\n}\n","scene":"@group(0) @binding(1) var engraving: texture_2d<f32>;\n@group(0) @binding(2) var linearSampler: sampler;\n\nfn stars(rd:vec3f)->vec3f{\n var out=vec3f(0);let dir=rotateZ(rotateY(rd,.25),-.42);\n // Direction-space stars stay fixed in world space during camera motion.\n for(var j=0;j<3;j++) {\n  let scale=vec3f(210.0+f32(j)*97.0);\n  let p=dir*scale;let id=floor(p);let f=fract(p)-.5;\n  let h=hash31(id+f32(j)*7.13);let d=length(f);\n  let star=exp(-d*d*(170.0+f32(j)*80.0))*smoothstep(.925,.992,h);\n  out+=star*mix(vec3f(.64,.78,1.0),vec3f(1,.82,.66),h)*3.8;\n }\n let cloud=noise3(dir*4.2)*.65+noise3(dir*10.1)*.35;\n let band=exp(-pow(abs(dir.y+.12),2.0)*19.0);\n out+=vec3f(.034,.044,.072)*pow(cloud,3.0)*band;\n return out;\n}\nfn studio(rd:vec3f)->vec3f{\n let sky=mix(vec3f(.007,.009,.018),vec3f(.055,.061,.080),saturate(rd.y*.5+.5));\n let keyDirection=normalize(vec3f(-1.5,.75,1.35));\n let keyRight=normalize(cross(keyDirection,vec3f(0,1,0)));\n let keyUp=cross(keyRight,keyDirection);\n let key=(1-smoothstep(.042,.060,abs(dot(rd,keyRight))))*(1-smoothstep(.29,.35,abs(dot(rd,keyUp))))*smoothstep(.65,.8,dot(rd,keyDirection))*5.2;\n let strip=pow(max(dot(rd,normalize(vec3f(.80,.22,-.70))),0.0),100.0)*5.5;\n let overhead=pow(max(dot(rd,normalize(vec3f(-.1,1.0,.1))),0.0),32.0)*2.2;\n let soft=pow(max(dot(rd,normalize(vec3f(1.1,.7,1.2))),0.0),9.0)*.34;\n return sky+key*vec3f(.87,.94,1.0)+strip*vec3f(.39,.36,.9)+overhead*vec3f(.70,.83,1.0)+soft*vec3f(1.0,.81,.62);\n}\nfn atmosphere(ro:vec3f,rd:vec3f)->vec3f{\n let pc=vec3f(0,-18.45,-34);let pr=19.0;\n let sunDir=normalize(vec3f(.005,-.014+u.parameters.x*.116,-1));\n var color=stars(rd)*.68+vec3f(.0008,.0010,.0020);\n let angular=acos(clamp(dot(rd,sunDir),-.999999,.999999));\n color+=vec3f(1.0,.83,.53)*exp(-angular*angular*950.0)*(.25+u.parameters.x*2.0);\n color+=vec3f(1.0,.97,.81)*(1-smoothstep(.010,.013,angular))*7.0;\n let hit=sphereHit(ro,rd,pc,pr);\n if(hit.x>0.0){\n  let p=ro+rd*hit.x;let n=normalize(p-pc);let rim=pow(1.0-max(0.0,dot(n,-rd)),4.0);\n  let light=max(0.0,dot(n,sunDir));\n  let cloud=noise3(n*36.0)*.65+noise3(n*83.0)*.35;\n  color=vec3f(.0008,.0012,.0023)+vec3f(.014,.021,.032)*cloud*light;\n  color+=rim*vec3f(.15,.31,.54)*(.13+light*3.2);\n  color+=pow(rim,4.0)*vec3f(.8,.50,.20)*pow(max(dot(n,sunDir),0.0),.5)*u.parameters.x;\n } else {\n  let q=pc-ro;let closest=length(q-rd*max(dot(q,rd),0.0));\n  color+=vec3f(.18,.36,.65)*exp(-max(0.0,closest-pr)*15.0)*(.10+u.parameters.x*.5);\n }\n let moon=vec3f(0,4.8,-28);let mh=sphereHit(ro,rd,moon,1.65);\n if(mh.x>0.0 && (hit.x<0.0||mh.x<hit.x)) {\n  let n=normalize(ro+rd*mh.x-moon);let rim=pow(1-max(0.0,dot(n,-rd)),4.0);\n  let tex=noise3(n*32.0);\n  color=vec3f(.003,.0034,.004)*tex+vec3f(.29,.25,.18)*rim*.19;\n }\n // Very restrained anamorphic flare, not an opaque neon line.\n let flare=exp(-pow(rd.y-sunDir.y,2.0)*150000.0)*exp(-abs(rd.x-sunDir.x)*9.0);\n if(hit.x<0.0){color+=vec3f(.16,.25,.47)*flare*u.parameters.x*.6;}\n return color;\n}\nfn cylinder(p:vec3f,r:f32,h:f32)->f32 {\n let q=vec2f(length(p.xz)-r,abs(p.y)-h);return length(max(q,vec2f(0)))+min(max(q.x,q.y),0.0);\n}\nfn beveledCone(p:vec3f,bottom:f32,top:f32,h:f32,bevel:f32)->f32{\n let r=mix(bottom,top,saturate(p.y/(2*h)+.5));\n let q=vec2f(length(p.xz)-r,abs(p.y)-h);\n return length(max(q,vec2f(0)))+min(max(q.x,q.y),0.0)-bevel;\n}\nfn machinery(p:vec3f)->vec2f{\n let ex=u.forward.w;\n var d=beveledCone(p-vec3f(0,-.60+ex*.16,0),.915,.846,.178,.041);\n var mat=1.0;\n let foot=cylinder(p-vec3f(0,-.838,0),.942,.041)-.017;\n if(foot<d){d=foot;mat=2.0;}\n let lip=cylinder(p-vec3f(0,-.346+ex*.52,0),.853,.026)-.011;\n if(lip<d){d=lip;mat=1.0;}\n let led=length(vec2f(length(p.xz)-.847,p.y+.309-ex*.52))-.010;\n if(led<d){d=led;mat=3.0;}\n // Concept assembly: a separate substrate becomes visible only in the exploded shot.\n if(ex>.04){\n  let pcb=cylinder(p-vec3f(0,-.23+ex*.82,0),.74,.018)-.005;\n  if(pcb<d){d=pcb;mat=4.0;}\n  let disc=cylinder(p-vec3f(0,-.11+ex*1.13,0),.55,.010)-.005;\n  if(disc<d){d=disc;mat=5.0;}\n }\n return vec2f(d,mat);\n}\nfn machineryHit(ro:vec3f,rd:vec3f)->vec2f{\n let bounds=sphereHit(ro,rd,vec3f(0,-.21+u.forward.w*.4,0),1.50);\n if(bounds.y<0.0){return vec2f(-1.0);}\n var t=max(0.002,bounds.x);\n for(var i=0;i<76;i++) {\n  let d=machinery(ro+rd*t);\n  if(d.x<.0007*(1.0+t*.2)){return vec2f(t,d.y);}\n  t+=d.x*.72;\n  if(t>bounds.y){break;}\n }\n return vec2f(-1.0);\n}\nfn machineNormal(p:vec3f)->vec3f{\n let e=.0015;\n return normalize(vec3f(machinery(p+vec3f(e,0,0)).x-machinery(p-vec3f(e,0,0)).x,\n machinery(p+vec3f(0,e,0)).x-machinery(p-vec3f(0,e,0)).x,\n machinery(p+vec3f(0,0,e)).x-machinery(p-vec3f(0,0,e)).x));\n}\nfn machineColor(p:vec3f,n:vec3f,rd:vec3f,material:f32)->vec3f{\n let nv=max(dot(n,-rd),.001);let refl=reflect(rd,n);\n let fres=.56+.44*pow(1.0-nv,5.0);\n let angle=atan2(p.x,p.z);\n let brush=.988+.012*sin(p.y*2500.0+noise3(p*31.0)*2.0);\n var metal=studio(refl)*mix(vec3f(.42,.45,.51),vec3f(.83,.87,.95),pow(1.0-nv,3.0))*fres*brush;\n metal+=vec3f(.034,.034,.041)*max(dot(n,normalize(vec3f(-2,3,4))),0.0);\n let seam=1.0-smoothstep(.002,.009,abs(p.y+.747-u.forward.w*.16));\n metal*=1.0-seam*.80;\n if(material>1.5 && material<2.5){metal*=.15;}\n if(material>2.5 && material<3.5){return vec3f(.45,.68,1.0)*3.6*u.up.w;}\n if(material>3.5 && material<4.5){\n  let r=length(p.xz);let a=atan2(p.z,p.x);\n  let tracks=pow(.5+.5*sin(r*120.0),25.0)*.45+pow(.5+.5*sin(a*26.0),60.0)*.65;\n  return mix(vec3f(.008,.021,.02),vec3f(.65,.40,.115)*(.4+max(n.y,0.0)*.5),saturate(tracks)) + studio(refl)*.13;\n }\n if(material>4.5){return vec3f(.12,.22,.42)*studio(refl)+vec3f(.05,.08,.14);}\n // The wordmark is an engraved texture in object space, not a floating label.\n let uv=vec2f(.5+angle*.88,.5-(p.y+.59-u.forward.w*.16)/.115);\n if(all(uv>vec2f(0))&&all(uv<vec2f(1))&&p.z>0.0){\n  let etch=textureSampleLevel(engraving,linearSampler,uv,0.0).r;\n  metal=mix(metal,vec3f(.25,.29,.37)+studio(refl)*.06,etch*.9);\n }\n let led=exp(-pow((p.y+.705-u.forward.w*.16)*420.0,2.0))*(1-smoothstep(.024,.044,abs(angle)));\n metal+=vec3f(.32,.65,1.0)*led*2.0;\n return metal;\n}\nfn energyVolume(ro:vec3f,rd:vec3f,near:f32,far:f32,steps:f32)->vec3f{\n let len=max(0.0,far-near);let stride=len/max(steps,1.0);\n var sum=vec3f(0);var trans=1.0;\n let t=u.resolution.z;let core=u.orb.xyz;\n let start=near+stride*.5;\n for(var j=0;j<64;j++) {\n  if(f32(j)>=steps){break;}\n  let pos=ro+rd*(start+f32(j)*stride);let raw=(pos-core)/u.orb.w;\n  let q=rotateY(raw,t*.12);let radial=length(q);\n  let n=noise3(q*5.2+vec3f(0,t*.04,0));\n  let n2=noise3(q*12.1-vec3f(t*.02,0,0));\n  let haze=pow(max(0.0,n*.7+n2*.3-.38),2.0)*3.0*(1-smoothstep(.72,1.0,radial));\n  var density=haze*.25;var emitted=mix(vec3f(.17,.04,.42),vec3f(.045,.13,.35),n)*haze*.28;\n  for(var k=0;k<3;k++){\n   let f=f32(k);var v=rotateZ(rotateX(q,.35+f*1.04+t*.025),f*.77+t*.05);\n   let rr=length(v.xz);let a=atan2(v.z,v.x);\n   let path=.49+f*.095+.04*sin(a*3.0+t*.18+f*2.0);\n   let torus=length(vec2f(rr-path,v.y*.85+.062*sin(a*2.0-t*.1+f)));\n   let variance=.00011+f*.000025;\n   let footprint=variance+stride*stride/12.0;\n   let filament=exp(-torus*torus/footprint)*sqrt(variance/footprint);\n   let shroud=exp(-torus*torus/.0020)*(.6+n2*.4);\n   let current=.34+.66*pow(.5+.5*sin(a*2.0-t*(.8+f*.18)+f),3.0);\n   emitted+=mix(vec3f(.080,.43,1.0),vec3f(.40,.20,.90),f*.44)*(filament*5.5+shroud*.28)*current;\n   density+=filament*.1+shroud*.055;\n  }\n  let heart=exp(-radial*radial/.0025);\n  emitted+=vec3f(.35,.69,1.0)*heart*4.5;\n  sum+=trans*emitted*stride*3.0*u.up.w;\n  trans*=exp(-density*stride*.72);\n }\n // A compact luminous source gives the trails a coherent centre.\n let d=length(cross(core-ro,rd));let nearest=dot(core-ro,rd);\n if(nearest>near && nearest<far){sum+=vec3f(.50,.83,1.0)*exp(-d*d/.0006)*1.3*u.up.w;}\n return sum;\n}\nfn glass(ro:vec3f,rd:vec3f,hit:vec2f,reflectionOnly:bool)->vec3f{\n let p=ro+rd*hit.x;let n=normalize(p-u.orb.xyz);\n let nv=max(0.0,dot(n,-rd));let fres=.035+.965*pow(1.0-nv,5.0);\n let inDir=refract(rd,n,1.0/1.46);\n let inStart=p+inDir*.002;let second=sphereHit(inStart,inDir,u.orb.xyz,u.orb.w);\n let exitPoint=inStart+inDir*max(second.y,0.0);let exitN=normalize(exitPoint-u.orb.xyz);\n let outDir=refract(inDir,-exitN,1.46);\n var backdrop=studio(normalize(outDir+vec3f(.00001)))*.20+stars(normalize(outDir+vec3f(.00001)))*.25;\n let shellAbsorb=exp(-vec3f(.09,.055,.015)*max(second.y,0.0));\n var steps=u.parameters.z;\n if(reflectionOnly){steps=12.0;}\n let inner=energyVolume(inStart,inDir,0,max(second.y,0.0),steps);\n var col=(backdrop*shellAbsorb+inner)*(1-fres*.80)+studio(reflect(rd,n))*fres;\n // A second, slightly displaced interface gives the glass shell a visible thickness.\n let rim=pow(1-nv,11.0);\n col+=rim*vec3f(.21,.31,.59)*.44;\n col+=pow(max(dot(reflect(rd,n),normalize(vec3f(-1.5,.75,1.35))),0.0),240.0)*vec3f(.7,.83,1.0)*2.0;\n return col;\n}\nfn product(ro:vec3f,rd:vec3f,reflected:bool)->vec4f{\n let ball=sphereHit(ro,rd,u.orb.xyz,u.orb.w);\n let solid=machineryHit(ro,rd);\n if(solid.x>0.0 && (ball.x<0.0||solid.x<ball.x)){\n  let p=ro+rd*solid.x;return vec4f(machineColor(p,machineNormal(p),rd,solid.y),solid.x);\n }\n if(ball.x>0.0){return vec4f(glass(ro,rd,ball,reflected),ball.x);}\n return vec4f(0,0,0,-1);\n}\n@fragment fn sceneFragment(in:VertexOut)->@location(0) vec4f{\n let ro=u.camera.xyz;let rd=direction(in.uv);\n if(u.right.w<.5){return vec4f(atmosphere(ro,rd),1);}\n if(u.right.w>1.5){\n  let h=sphereHit(ro,rd,u.orb.xyz,u.orb.w*1.28);\n  var col=energyVolume(ro,rd,max(h.x,0.0),max(h.y,0.0),u.parameters.z+12.0);\n  col+=stars(rd)*.14;return vec4f(col,1);\n }\n let hit=product(ro,rd,false);\n var col=vec3f(.0017,.0022,.0034)+stars(rd)*.045;\n if(hit.w>0.0){col=hit.rgb;}\n let ground=(-.906-ro.y)/rd.y;\n if(ground>0.0 && (hit.w<0.0||ground<hit.w)){\n  let p=ro+rd*ground;let n=vec3f(0,1,0);let refl=reflect(rd,n);\n  let rr=length(p.xz);let fres=.08+.70*pow(1-max(dot(n,-rd),0.0),5.0);\n  let reflection=product(p+vec3f(0,.005,0),refl,true);\n  let floorNoise=noise3(p*7.0)*.50+noise3(p*27.0)*.3+noise3(p*93.0)*.20;\n  col=vec3f(.004,.005,.008)+studio(refl)*.018*(.8+floorNoise*.2);\n  if(reflection.w>0.0){col+=reflection.rgb*fres*.67;}\n  let halo=exp(-rr*rr*1.35)*(.55+.45*floorNoise);\n  col+=vec3f(.024,.055,.14)*halo*u.up.w;\n  let contact=1.0-.9*exp(-rr*rr*1.7);\n  col*=contact+.10;\n  col=mix(vec3f(.0017,.0022,.0034)+stars(rd)*.045,col,smoothstep(.0,.17,abs(rd.y)));\n }\n return vec4f(col,1);\n}\n"};
-const INLINE_COMPAT="#version 300 es\nprecision highp float;\nprecision highp int;\nuniform sampler2D engraving;\nin vec2 vUv;\nout vec4 fragColor;\nstruct Uniforms{vec4 resolution;vec4 camera;vec4 right;vec4 up;vec4 forward;vec4 parameters;vec4 orb;vec4 extra;};\nuniform Uniforms u;\nconst float PI=3.14159265359;\nfloat saturate(float x){return clamp(x,0.0,1.0);}\nfloat hash31(vec3 p){vec3 q=fract(p*.1031);q+=vec3(dot(q,q.yzx+33.33));return fract((q.x+q.y)*q.z);}\nfloat hash11(float p){return fract(sin(p*127.1)*43758.5453);}\nvec3 rotateX(vec3 p,float a){float c=cos(a);float s=sin(a);return vec3(p.x,c*p.y-s*p.z,s*p.y+c*p.z);}\nvec3 rotateY(vec3 p,float a){float c=cos(a);float s=sin(a);return vec3(c*p.x+s*p.z,p.y,-s*p.x+c*p.z);}\nvec3 rotateZ(vec3 p,float a){float c=cos(a);float s=sin(a);return vec3(c*p.x-s*p.y,s*p.x+c*p.y,p.z);}\nfloat noise3(vec3 p){\n vec3 i=floor(p);vec3 f=fract(p);vec3 s=f*f*(3.0-2.0*f);\n return mix(mix(mix(hash31(i),hash31(i+vec3(1.0,0.0,0.0)),s.x),mix(hash31(i+vec3(0.0,1.0,0.0)),hash31(i+vec3(1.0,1.0,0.0)),s.x),s.y),\n mix(mix(hash31(i+vec3(0.0,0.0,1.0)),hash31(i+vec3(1.0,0.0,1.0)),s.x),mix(hash31(i+vec3(0.0,1.0,1.0)),hash31(i+vec3(1.0,1.0,1.0)),s.x),s.y),s.z);\n}\nvec2 sphereHit(vec3 ro,vec3 rd,vec3 center,float r){\n vec3 q=ro-center;float b=dot(q,rd);float h=b*b-dot(q,q)+r*r;\n if(h<0.0){return vec2(-1.0);}\n float s=sqrt(h);return vec2(-b-s,-b+s);\n}\nvec3 direction(vec2 uv){\n vec2 q=vec2(uv.x*2.0-1.0,1.0-uv.y*2.0);\n return normalize(u.forward.xyz+(q.x*u.resolution.w*u.right.xyz+q.y*u.up.xyz)*u.camera.w);\n}\nvec3 stars(vec3 rd){\n vec3 accumulated=vec3(0.0);vec3 dir=rotateZ(rotateY(rd,.25),-.42);\n // Direction-space stars stay fixed in world space during camera motion.\n for(int j=0;j<3;j++) {\n  vec3 scale=vec3(210.0+float(j)*97.0);\n  vec3 p=dir*scale;vec3 id=floor(p);vec3 f=fract(p)-.5;\n  float h=hash31(id+float(j)*7.13);float d=length(f);\n  float star=exp(-d*d*(170.0+float(j)*80.0))*smoothstep(.925,.992,h);\n  accumulated+=star*mix(vec3(.64,.78,1.0),vec3(1.0,.82,.66),h)*3.8;\n }\n float cloud=noise3(dir*4.2)*.65+noise3(dir*10.1)*.35;\n float band=exp(-pow(abs(dir.y+.12),2.0)*19.0);\n accumulated+=vec3(.034,.044,.072)*pow(cloud,3.0)*band;\n return accumulated;\n}\nvec3 studio(vec3 rd){\n vec3 sky=mix(vec3(.007,.009,.018),vec3(.055,.061,.080),saturate(rd.y*.5+.5));\n vec3 keyDirection=normalize(vec3(-1.5,.75,1.35));\n vec3 keyRight=normalize(cross(keyDirection,vec3(0.0,1.0,0.0)));\n vec3 keyUp=cross(keyRight,keyDirection);\n float key=(1.0-smoothstep(.042,.060,abs(dot(rd,keyRight))))*(1.0-smoothstep(.29,.35,abs(dot(rd,keyUp))))*smoothstep(.65,.8,dot(rd,keyDirection))*5.2;\n float strip=pow(max(dot(rd,normalize(vec3(.80,.22,-.70))),0.0),100.0)*5.5;\n float overhead=pow(max(dot(rd,normalize(vec3(-.1,1.0,.1))),0.0),32.0)*2.2;\n float soft=pow(max(dot(rd,normalize(vec3(1.1,.7,1.2))),0.0),9.0)*.34;\n return sky+key*vec3(.87,.94,1.0)+strip*vec3(.39,.36,.9)+overhead*vec3(.70,.83,1.0)+soft*vec3(1.0,.81,.62);\n}\nvec3 atmosphere(vec3 ro,vec3 rd){\n vec3 pc=vec3(0.0,-18.45,-34.0);float pr=19.0;\n vec3 sunDir=normalize(vec3(.005,-.014+u.parameters.x*.116,-1.0));\n vec3 color=stars(rd)*.68+vec3(.0008,.0010,.0020);\n float angular=acos(clamp(dot(rd,sunDir),-.999999,.999999));\n color+=vec3(1.0,.83,.53)*exp(-angular*angular*950.0)*(.25+u.parameters.x*2.0);\n color+=vec3(1.0,.97,.81)*(1.0-smoothstep(.010,.013,angular))*7.0;\n vec2 hit=sphereHit(ro,rd,pc,pr);\n if(hit.x>0.0){\n  vec3 p=ro+rd*hit.x;vec3 n=normalize(p-pc);float rim=pow(1.0-max(0.0,dot(n,-rd)),4.0);\n  float light=max(0.0,dot(n,sunDir));\n  float cloud=noise3(n*36.0)*.65+noise3(n*83.0)*.35;\n  color=vec3(.0008,.0012,.0023)+vec3(.014,.021,.032)*cloud*light;\n  color+=rim*vec3(.15,.31,.54)*(.13+light*3.2);\n  color+=pow(rim,4.0)*vec3(.8,.50,.20)*pow(max(dot(n,sunDir),0.0),.5)*u.parameters.x;\n } else {\n  vec3 q=pc-ro;float closest=length(q-rd*max(dot(q,rd),0.0));\n  color+=vec3(.18,.36,.65)*exp(-max(0.0,closest-pr)*15.0)*(.10+u.parameters.x*.5);\n }\n vec3 moon=vec3(0.0,4.8,-28.0);vec2 mh=sphereHit(ro,rd,moon,1.65);\n if(mh.x>0.0 && (hit.x<0.0||mh.x<hit.x)) {\n  vec3 n=normalize(ro+rd*mh.x-moon);float rim=pow(1.0-max(0.0,dot(n,-rd)),4.0);\n  float tex=noise3(n*32.0);\n  color=vec3(.003,.0034,.004)*tex+vec3(.29,.25,.18)*rim*.19;\n }\n // Very restrained anamorphic flare, not an opaque neon line.\n float flare=exp(-pow(rd.y-sunDir.y,2.0)*150000.0)*exp(-abs(rd.x-sunDir.x)*9.0);\n if(hit.x<0.0){color+=vec3(.16,.25,.47)*flare*u.parameters.x*.6;}\n return color;\n}\nfloat cylinder(vec3 p,float r,float h){\n vec2 q=vec2(length(p.xz)-r,abs(p.y)-h);return length(max(q,vec2(0.0)))+min(max(q.x,q.y),0.0);\n}\nfloat beveledCone(vec3 p,float bottom,float top,float h,float bevel){\n float r=mix(bottom,top,saturate(p.y/(2.0*h)+.5));\n vec2 q=vec2(length(p.xz)-r,abs(p.y)-h);\n return length(max(q,vec2(0.0)))+min(max(q.x,q.y),0.0)-bevel;\n}\nvec2 machinery(vec3 p){\n float ex=u.forward.w;\n float d=beveledCone(p-vec3(0.0,-.60+ex*.16,0.0),.915,.846,.178,.041);\n float mat=1.0;\n float foot=cylinder(p-vec3(0.0,-.838,0.0),.942,.041)-.017;\n if(foot<d){d=foot;mat=2.0;}\n float lip=cylinder(p-vec3(0.0,-.346+ex*.52,0.0),.853,.026)-.011;\n if(lip<d){d=lip;mat=1.0;}\n float led=length(vec2(length(p.xz)-.847,p.y+.309-ex*.52))-.010;\n if(led<d){d=led;mat=3.0;}\n // Concept assembly: a separate substrate becomes visible only in the exploded shot.\n if(ex>.04){\n  float pcb=cylinder(p-vec3(0.0,-.23+ex*.82,0.0),.74,.018)-.005;\n  if(pcb<d){d=pcb;mat=4.0;}\n  float disc=cylinder(p-vec3(0.0,-.11+ex*1.13,0.0),.55,.010)-.005;\n  if(disc<d){d=disc;mat=5.0;}\n }\n return vec2(d,mat);\n}\nvec2 machineryHit(vec3 ro,vec3 rd){\n vec2 bounds=sphereHit(ro,rd,vec3(0.0,-.21+u.forward.w*.4,0.0),1.50);\n if(bounds.y<0.0){return vec2(-1.0);}\n float t=max(0.002,bounds.x);\n for(int i=0;i<76;i++) {\n  vec2 d=machinery(ro+rd*t);\n  if(d.x<.0007*(1.0+t*.2)){return vec2(t,d.y);}\n  t+=d.x*.72;\n  if(t>bounds.y){break;}\n }\n return vec2(-1.0);\n}\nvec3 machineNormal(vec3 p){\n float e=.0015;\n return normalize(vec3(machinery(p+vec3(e,0.0,0.0)).x-machinery(p-vec3(e,0.0,0.0)).x,\n machinery(p+vec3(0.0,e,0.0)).x-machinery(p-vec3(0.0,e,0.0)).x,\n machinery(p+vec3(0.0,0.0,e)).x-machinery(p-vec3(0.0,0.0,e)).x));\n}\nvec3 machineColor(vec3 p,vec3 n,vec3 rd,float material){\n float nv=max(dot(n,-rd),.001);vec3 refl=reflect(rd,n);\n float fres=.56+.44*pow(1.0-nv,5.0);\n float angle=atan(p.x,p.z);\n float brush=.988+.012*sin(p.y*2500.0+noise3(p*31.0)*2.0);\n vec3 metal=studio(refl)*mix(vec3(.42,.45,.51),vec3(.83,.87,.95),pow(1.0-nv,3.0))*fres*brush;\n metal+=vec3(.034,.034,.041)*max(dot(n,normalize(vec3(-2.0,3.0,4.0))),0.0);\n float seam=1.0-smoothstep(.002,.009,abs(p.y+.747-u.forward.w*.16));\n metal*=1.0-seam*.80;\n if(material>1.5 && material<2.5){metal*=.15;}\n if(material>2.5 && material<3.5){return vec3(.45,.68,1.0)*3.6*u.up.w;}\n if(material>3.5 && material<4.5){\n  float r=length(p.xz);float a=atan(p.z,p.x);\n  float tracks=pow(.5+.5*sin(r*120.0),25.0)*.45+pow(.5+.5*sin(a*26.0),60.0)*.65;\n  return mix(vec3(.008,.021,.02),vec3(.65,.40,.115)*(.4+max(n.y,0.0)*.5),saturate(tracks)) + studio(refl)*.13;\n }\n if(material>4.5){return vec3(.12,.22,.42)*studio(refl)+vec3(.05,.08,.14);}\n // The wordmark is an engraved texture in object space, not a floating label.\n vec2 uv=vec2(.5+angle*.88,.5-(p.y+.59-u.forward.w*.16)/.115);\n if(all(greaterThan(uv,vec2(0.0)))&&all(lessThan(uv,vec2(1.0)))&&p.z>0.0){\n  float etch=textureLod(engraving,uv,0.0).r;\n  metal=mix(metal,vec3(.25,.29,.37)+studio(refl)*.06,etch*.9);\n }\n float led=exp(-pow((p.y+.705-u.forward.w*.16)*420.0,2.0))*(1.0-smoothstep(.024,.044,abs(angle)));\n metal+=vec3(.32,.65,1.0)*led*2.0;\n return metal;\n}\nvec3 energyVolume(vec3 ro,vec3 rd,float near,float far,float steps){\n float len=max(0.0,far-near);float stride=len/max(steps,1.0);\n vec3 sum=vec3(0.0);float trans=1.0;\n float t=u.resolution.z;vec3 core=u.orb.xyz;\n float start=near+stride*.5;\n for(int j=0;j<64;j++) {\n  if(float(j)>=steps){break;}\n  vec3 pos=ro+rd*(start+float(j)*stride);vec3 raw=(pos-core)/u.orb.w;\n  vec3 q=rotateY(raw,t*.12);float radial=length(q);\n  float n=noise3(q*5.2+vec3(0.0,t*.04,0.0));\n  float n2=noise3(q*12.1-vec3(t*.02,0.0,0.0));\n  float haze=pow(max(0.0,n*.7+n2*.3-.38),2.0)*3.0*(1.0-smoothstep(.72,1.0,radial));\n  float density=haze*.25;vec3 emitted=mix(vec3(.17,.04,.42),vec3(.045,.13,.35),n)*haze*.28;\n  for(int k=0;k<3;k++){\n   float f=float(k);vec3 v=rotateZ(rotateX(q,.35+f*1.04+t*.025),f*.77+t*.05);\n   float rr=length(v.xz);float a=atan(v.z,v.x);\n   float path=.49+f*.095+.04*sin(a*3.0+t*.18+f*2.0);\n   float torus=length(vec2(rr-path,v.y*.85+.062*sin(a*2.0-t*.1+f)));\n   float variance=.00011+f*.000025;\n   float footprint=variance+stride*stride/12.0;\n   float filament=exp(-torus*torus/footprint)*sqrt(variance/footprint);\n   float shroud=exp(-torus*torus/.0020)*(.6+n2*.4);\n   float current=.34+.66*pow(.5+.5*sin(a*2.0-t*(.8+f*.18)+f),3.0);\n   emitted+=mix(vec3(.080,.43,1.0),vec3(.40,.20,.90),f*.44)*(filament*5.5+shroud*.28)*current;\n   density+=filament*.1+shroud*.055;\n  }\n  float heart=exp(-radial*radial/.0025);\n  emitted+=vec3(.35,.69,1.0)*heart*4.5;\n  sum+=trans*emitted*stride*3.0*u.up.w;\n  trans*=exp(-density*stride*.72);\n }\n // A compact luminous source gives the trails a coherent centre.\n float d=length(cross(core-ro,rd));float nearest=dot(core-ro,rd);\n if(nearest>near && nearest<far){sum+=vec3(.50,.83,1.0)*exp(-d*d/.0006)*1.3*u.up.w;}\n return sum;\n}\nvec3 glass(vec3 ro,vec3 rd,vec2 hit,bool reflectionOnly){\n vec3 p=ro+rd*hit.x;vec3 n=normalize(p-u.orb.xyz);\n float nv=max(0.0,dot(n,-rd));float fres=.035+.965*pow(1.0-nv,5.0);\n vec3 inDir=refract(rd,n,1.0/1.46);\n vec3 inStart=p+inDir*.002;vec2 second=sphereHit(inStart,inDir,u.orb.xyz,u.orb.w);\n vec3 exitPoint=inStart+inDir*max(second.y,0.0);vec3 exitN=normalize(exitPoint-u.orb.xyz);\n vec3 outDir=refract(inDir,-exitN,1.46);\n vec3 backdrop=studio(normalize(outDir+vec3(.00001)))*.20+stars(normalize(outDir+vec3(.00001)))*.25;\n vec3 shellAbsorb=exp(-vec3(.09,.055,.015)*max(second.y,0.0));\n float steps=u.parameters.z;\n if(reflectionOnly){steps=12.0;}\n vec3 inner=energyVolume(inStart,inDir,0.0,max(second.y,0.0),steps);\n vec3 col=(backdrop*shellAbsorb+inner)*(1.0-fres*.80)+studio(reflect(rd,n))*fres;\n // A second, slightly displaced interface gives the glass shell a visible thickness.\n float rim=pow(1.0-nv,11.0);\n col+=rim*vec3(.21,.31,.59)*.44;\n col+=pow(max(dot(reflect(rd,n),normalize(vec3(-1.5,.75,1.35))),0.0),240.0)*vec3(.7,.83,1.0)*2.0;\n return col;\n}\nvec4 product(vec3 ro,vec3 rd,bool reflected){\n vec2 ball=sphereHit(ro,rd,u.orb.xyz,u.orb.w);\n vec2 solid=machineryHit(ro,rd);\n if(solid.x>0.0 && (ball.x<0.0||solid.x<ball.x)){\n  vec3 p=ro+rd*solid.x;return vec4(machineColor(p,machineNormal(p),rd,solid.y),solid.x);\n }\n if(ball.x>0.0){return vec4(glass(ro,rd,ball,reflected),ball.x);}\n return vec4(0.0,0.0,0.0,-1.0);\n}\nvec4 sceneFragment(){\n vec3 ro=u.camera.xyz;vec3 rd=direction(vUv);\n if(u.right.w<.5){return vec4(atmosphere(ro,rd),1.0);}\n if(u.right.w>1.5){\n  vec2 h=sphereHit(ro,rd,u.orb.xyz,u.orb.w*1.28);\n  vec3 col=energyVolume(ro,rd,max(h.x,0.0),max(h.y,0.0),u.parameters.z+12.0);\n  col+=stars(rd)*.14;return vec4(col,1.0);\n }\n vec4 hit=product(ro,rd,false);\n vec3 col=vec3(.0017,.0022,.0034)+stars(rd)*.045;\n if(hit.w>0.0){col=hit.rgb;}\n float ground=(-.906-ro.y)/rd.y;\n if(ground>0.0 && (hit.w<0.0||ground<hit.w)){\n  vec3 p=ro+rd*ground;vec3 n=vec3(0.0,1.0,0.0);vec3 refl=reflect(rd,n);\n  float rr=length(p.xz);float fres=.08+.70*pow(1.0-max(dot(n,-rd),0.0),5.0);\n  vec4 reflection=product(p+vec3(0.0,.005,0.0),refl,true);\n  float floorNoise=noise3(p*7.0)*.50+noise3(p*27.0)*.3+noise3(p*93.0)*.20;\n  col=vec3(.004,.005,.008)+studio(refl)*.018*(.8+floorNoise*.2);\n  if(reflection.w>0.0){col+=reflection.rgb*fres*.67;}\n  float halo=exp(-rr*rr*1.35)*(.55+.45*floorNoise);\n  col+=vec3(.024,.055,.14)*halo*u.up.w;\n  float contact=1.0-.9*exp(-rr*rr*1.7);\n  col*=contact+.10;\n  col=mix(vec3(.0017,.0022,.0034)+stars(rd)*.045,col,smoothstep(.0,.17,abs(rd.y)));\n }\n return vec4(col,1.0);\n}\nvoid main(){fragColor=sceneFragment();}\n";
+const INLINE_SHADERS={"cinematic-post":"// Linear HDR throughout the pyramid. Grade / display transfer happen exactly once.\nstruct CineParams { size:vec4f, look:vec4f, film:vec4f, source:vec4f, lens:vec4f };\n@group(0) @binding(0) var cineInput:texture_2d<f32>;\n@group(0) @binding(1) var cineSampler:sampler;\n@group(0) @binding(2) var<uniform> cp:CineParams;\n@group(0) @binding(3) var cineBloom:texture_2d<f32>;\n@group(0) @binding(4) var cineStreak:texture_2d<f32>;\n@group(0) @binding(5) var cineFog:texture_2d<f32>;\nstruct CineVertex{@builtin(position) position:vec4f,@location(0) uv:vec2f};\n@vertex fn cineVertex(@builtin(vertex_index) i:u32)->CineVertex{\n let x=f32((i<<1u)&2u);let y=f32(i&2u);var o:CineVertex;\n o.position=vec4f(x*2-1,y*2-1,0,1);o.uv=vec2f(x,1-y);return o;\n}\nfn sampleCine(uv:vec2f)->vec3f{return textureSampleLevel(cineInput,cineSampler,uv,0).rgb;}\n@fragment fn bloomDown(in:CineVertex)->@location(0) vec4f{\n let px=1.0/vec2f(textureDimensions(cineInput));let uv=in.uv;\n // 9 bilinear taps; downfilter and blur are fused, replacing 3 passes/level.\n var c=sampleCine(uv)*.25;\n c+=(sampleCine(uv+px*vec2f(-1,-1))+sampleCine(uv+px*vec2f(1,-1))+sampleCine(uv+px*vec2f(-1,1))+sampleCine(uv+px*vec2f(1,1)))*.125;\n c+=(sampleCine(uv+px*vec2f(-2,0))+sampleCine(uv+px*vec2f(2,0))+sampleCine(uv+px*vec2f(0,-2))+sampleCine(uv+px*vec2f(0,2)))*.0625;\n if(cp.look.x>.5){\n  let peak=max(c.r,max(c.g,c.b));let knee=clamp(peak-.5,0.0,.8);\n  let weight=max(peak-.9,knee*knee/.8*.25)/max(peak,.0001);c*=weight;\n }\n return vec4f(c,1);\n}\n@fragment fn bloomUp(in:CineVertex)->@location(0) vec4f{\n let px=1.25/vec2f(textureDimensions(cineInput));let uv=in.uv;\n let small=(sampleCine(uv)*4+(sampleCine(uv+vec2f(px.x,0))+sampleCine(uv-vec2f(px.x,0))+sampleCine(uv+vec2f(0,px.y))+sampleCine(uv-vec2f(0,px.y)))*2+\n sampleCine(uv+px)+sampleCine(uv-px)+sampleCine(uv+px*vec2f(1,-1))+sampleCine(uv+px*vec2f(-1,1)))/16;\n let detail=textureSampleLevel(cineBloom,cineSampler,uv,0).rgb;\n return vec4f(mix(detail,small,.67),1);\n}\n@fragment fn anamorphic(in:CineVertex)->@location(0) vec4f{\n let pixel=1.0/vec2f(textureDimensions(cineInput));var c=sampleCine(in.uv)*.18;\n var total=.18;\n // Exponentially spaced highlights give long optical streaks at 1/8 resolution.\n for(var i=1;i<=8;i++){\n  let x=f32(i);let offset=pixel.x*x*x*1.8;let w=exp(-x*.27)*.12;\n  c+=(sampleCine(in.uv+vec2f(offset,0))+sampleCine(in.uv-vec2f(offset,0)))*w;total+=2*w;\n }\n return vec4f(c/total*vec3f(.42,.65,1.15),1);\n}\nfn cineAces(c:vec3f)->vec3f{return clamp((c*(2.51*c+.03))/(c*(2.43*c+.59)+.14),vec3f(0),vec3f(1));}\nfn fogAt(uv:vec2f,depth:f32)->vec3f{\n // Four depth-weighted samples avoid fog bleeding across the product silhouette.\n let dims=vec2f(textureDimensions(cineFog));let p=uv*dims-.5;let f=fract(p);let base=floor(p)+.5;\n var sum=vec3f(0);var total=0.0;\n for(var y=0;y<2;y++){for(var x=0;x<2;x++){\n  let s=textureSampleLevel(cineFog,cineSampler,(base+vec2f(f32(x),f32(y)))/dims,0);\n  let wx=select(1-f.x,f.x,x==1);let wy=select(1-f.y,f.y,y==1);\n  let w=wx*wy/(1+abs(s.a-depth)*4/max(1.0,depth));sum+=s.rgb*w;total+=w;\n }}\n return sum/max(total,.0001);\n}\n@fragment fn cineFinish(in:CineVertex)->@location(0) vec4f{\n let uv=in.uv;let p=uv-.5;let asp=cp.size.x/cp.size.y;\n let radial=(uv-cp.source.xy)*vec2f(asp,1);let r=length(radial);\n let shock=exp(-pow((r-cp.source.w)*60,2))*cp.source.z;\n let wobble=sin(r*72-cp.film.x*2.8)*.0003*cp.film.w;\n let warped=clamp(uv+normalize(radial+vec2f(.00001))*vec2f(1/asp,1)*(shock*.008+wobble),vec2f(.001),vec2f(.999));\n let chroma=p*dot(p,p)*(.001+shock*.003)*cp.film.w;\n let scene=textureSampleLevel(cineInput,cineSampler,warped,0);\n var col=scene.rgb;\n if(cp.film.w>0){col=vec3f(sampleCine(warped+chroma).r,col.g,sampleCine(warped-chroma).b);}\n if(cp.look.w>0){\n  let px=1.0/cp.size.zw;let blur=(sampleCine(warped+vec2f(px.x,0))+sampleCine(warped-vec2f(px.x,0))+sampleCine(warped+vec2f(0,px.y))+sampleCine(warped-vec2f(0,px.y)))*.25;\n  // Contrast-limited reconstruction; no bright ringing around emissive filaments.\n  col+=clamp(col-blur,-vec3f(.12),vec3f(.12))*cp.look.w;\n }\n let glow=textureSampleLevel(cineBloom,cineSampler,warped,0).rgb;\n col+=glow*cp.look.x;\n if(cp.look.y>0){\n  col+=textureSampleLevel(cineStreak,cineSampler,warped,0).rgb*cp.look.y;\n  // Off-axis lens ghosts respond to the image, not to a constant overlay.\n  let ghostUV=vec2f(.5)-p*.72;\n  let ghost=textureSampleLevel(cineBloom,cineSampler,ghostUV,0).rgb;\n  col+=ghost*vec3f(.16,.22,.32)*cp.look.y*smoothstep(.12,.65,length(p));\n }\n if(cp.look.z>0){col+=fogAt(warped,scene.a)*cp.look.z;}\n let dirt=pow(.5+.5*sin(uv.x*21+sin(uv.y*17))*sin(uv.y*31),6.0);\n col+=glow*dirt*.055*cp.film.w;\n col+=shock*vec3f(.025,.12,.25);\n let lum=dot(col,vec3f(.2126,.7152,.0722));\n col*=mix(vec3f(.94,.99,1.06),vec3f(1.045,1.012,.97),smoothstep(.1,1.8,lum));\n let vignette=1-dot(p*vec2f(.78,1),p*vec2f(.78,1))*.4;\n col=cineAces(max(col,vec3f(0))*cp.film.z*vignette)*cp.film.y;\n col=pow(col,vec3f(1/2.2));\n let grain=fract(sin(dot(floor(uv*cp.size.xy),vec2f(12.9898,78.233))+floor(cp.film.x*24)*.17)*43758.5453)-.5;\n return vec4f(clamp(col+grain*.0022*cp.film.y,vec3f(0),vec3f(1)),1);\n}\n","common":"struct Uniforms {\n resolution: vec4f, // width, height, film seconds, aspect\n camera: vec4f, // xyz, tangent of half vertical field of view\n right: vec4f, // xyz, world: 0 dawn, 1 studio, 2 interior\n up: vec4f, // xyz, energy\n forward: vec4f, // xyz, exploded amount\n parameters: vec4f, // sunrise, film fade, volume steps, audio energy\n orb: vec4f, // xyz centre, radius\n extra: vec4f // render scale, reserved\n};\n@group(0) @binding(0) var<uniform> u: Uniforms;\nconst PI: f32 = 3.14159265359;\nfn saturate(x:f32)->f32{return clamp(x,0.0,1.0);}\nfn hash31(p:vec3f)->f32{var q=fract(p*.1031);q+=vec3f(dot(q,q.yzx+33.33));return fract((q.x+q.y)*q.z);}\nfn hash11(p:f32)->f32{return fract(sin(p*127.1)*43758.5453);}\nfn rotateX(p:vec3f,a:f32)->vec3f{let c=cos(a);let s=sin(a);return vec3f(p.x,c*p.y-s*p.z,s*p.y+c*p.z);}\nfn rotateY(p:vec3f,a:f32)->vec3f{let c=cos(a);let s=sin(a);return vec3f(c*p.x+s*p.z,p.y,-s*p.x+c*p.z);}\nfn rotateZ(p:vec3f,a:f32)->vec3f{let c=cos(a);let s=sin(a);return vec3f(c*p.x-s*p.y,s*p.x+c*p.y,p.z);}\nfn noise3(p:vec3f)->f32{\n let i=floor(p);let f=fract(p);let s=f*f*(3.0-2.0*f);\n return mix(mix(mix(hash31(i),hash31(i+vec3f(1,0,0)),s.x),mix(hash31(i+vec3f(0,1,0)),hash31(i+vec3f(1,1,0)),s.x),s.y),\n mix(mix(hash31(i+vec3f(0,0,1)),hash31(i+vec3f(1,0,1)),s.x),mix(hash31(i+vec3f(0,1,1)),hash31(i+vec3f(1,1,1)),s.x),s.y),s.z);\n}\nfn sphereHit(ro:vec3f,rd:vec3f,center:vec3f,r:f32)->vec2f{\n let q=ro-center;let b=dot(q,rd);let h=b*b-dot(q,q)+r*r;\n if(h<0.0){return vec2f(-1.0);}\n let s=sqrt(h);return vec2f(-b-s,-b+s);\n}\nfn direction(uv:vec2f)->vec3f{\n let q=vec2f(uv.x*2.0-1.0,1.0-uv.y*2.0);\n return normalize(u.forward.xyz+(q.x*u.resolution.w*u.right.xyz+q.y*u.up.xyz)*u.camera.w);\n}\nstruct VertexOut{@builtin(position) position:vec4f,@location(0) uv:vec2f};\n@vertex fn fullscreen(@builtin(vertex_index) i:u32)->VertexOut{\n var p=array<vec2f,3>(vec2f(-1,-1),vec2f(3,-1),vec2f(-1,3));var o:VertexOut;\n o.position=vec4f(p[i],0,1);o.uv=p[i]*vec2f(.5,-.5)+.5;return o;\n}\n","particles":"struct Particle {position:vec4f,color:vec4f};\n@group(1) @binding(0) var<storage,read_write> outputParticles:array<Particle>;\n@compute @workgroup_size(128) fn simulate(@builtin(global_invocation_id) id:vec3u){\n let i=id.x;if(i>=min(arrayLength(&outputParticles),u32(u.extra.w))){return;}\n let f=f32(i);let h=hash11(f*.871+3.12);let h2=hash11(f*2.131+9.4);let h3=hash11(f*.12+7.9);\n let t=u.resolution.z;let arm=f32(i%5u);let a=h*PI*2.0+t*(.14+h2*.09);\n let r=.23+h2*.61;let tube=.038*(h3-.5);\n var p=vec3f(cos(a)*r,tube+sin(a*3+t*.21)*.055,sin(a)*r);\n p=rotateX(rotateZ(p,arm*.63+.24),arm*.74+.40);\n p+=vec3f(sin(a*5+f)*tube,cos(a*4+f)*tube,0);\n let fade=(.26+.74*pow(.5+.5*sin(a*3-t*.41),4.0));\n var size=mix(.0009,.0033,pow(h3,7.0));\n var tint=mix(vec3f(.12,.55,1.0),vec3f(.71,.33,1.0),h2);var opacity=fade*(.5+h3)*u.up.w;\n // An interleaved sparse population gives genuine near-field camera parallax.\n if(i%16u==0u && u.extra.y>0.0){\n  p=vec3f((h-.5)*6.0,(h2-.20)*3.2,(h3-.5)*6.0);\n  p+=vec3f(sin(t*.11+f)*.035,cos(t*.09+f)*.035,0);size=.002+h3*.003;\n  tint=mix(vec3f(.21,.46,.85),vec3f(.90,.56,.25),h);opacity=.12*u.extra.y;\n }\n outputParticles[i].position=vec4f(u.orb.xyz+p*u.orb.w,size);\n outputParticles[i].color=vec4f(tint,opacity);\n}\nstruct ParticleVertex{@builtin(position) position:vec4f,@location(0) uv:vec2f,@location(1) color:vec4f};\n@vertex fn particleVertex(@builtin(vertex_index) vi:u32,@builtin(instance_index) instance:u32)->ParticleVertex{\n var vertices=array<vec2f,6>(vec2f(-1,-1),vec2f(1,-1),vec2f(-1,1),vec2f(-1,1),vec2f(1,-1),vec2f(1,1));\n let p=outputParticles[instance];let d=p.position.xyz-u.camera.xyz;\n let depth=dot(d,u.forward.xyz);let xy=vec2f(dot(d,u.right.xyz)/u.resolution.w,dot(d,u.up.xyz))/u.camera.w;\n let corner=vertices[vi];let sz=p.position.w*2.3;\n var o:ParticleVertex;\n o.position=vec4f(xy+corner*vec2f(sz/u.resolution.w,sz)/u.camera.w,depth*.99,max(depth,.001));\n o.uv=corner;o.color=p.color;\n if(depth<.03||u.right.w<.5){o.position=vec4f(5,5,0,1);}\n return o;\n}\n@fragment fn particleFragment(in:ParticleVertex)->@location(0) vec4f{\n let r=dot(in.uv,in.uv);let glow=exp(-r*4.0)*(1-smoothstep(.55,1.0,r));\n return vec4f(in.color.rgb*in.color.a*glow*.85,0);\n}\n","post":"struct Post { size:vec4f, values:vec4f };\n@group(0) @binding(0) var inputTexture:texture_2d<f32>;\n@group(0) @binding(1) var texSampler:sampler;\n@group(0) @binding(2) var<uniform> post:Post;\nstruct V{@builtin(position) position:vec4f,@location(0) uv:vec2f};\n@vertex fn vs(@builtin(vertex_index) i:u32)->V{\n var p=array<vec2f,3>(vec2f(-1,-1),vec2f(3,-1),vec2f(-1,3));var o:V;o.position=vec4f(p[i],0,1);o.uv=p[i]*vec2f(.5,-.5)+.5;return o;\n}\n@fragment fn down(in:V)->@location(0) vec4f{\n let px=1.0/vec2f(textureDimensions(inputTexture));\n var c=textureSampleLevel(inputTexture,texSampler,in.uv+px*vec2f(-1,-1),0).rgb;\n c+=textureSampleLevel(inputTexture,texSampler,in.uv+px*vec2f(1,-1),0).rgb;\n c+=textureSampleLevel(inputTexture,texSampler,in.uv+px*vec2f(-1,1),0).rgb;\n c+=textureSampleLevel(inputTexture,texSampler,in.uv+px*vec2f(1,1),0).rgb;c*=.25;\n if(post.values.x>.5){let lum=max(max(c.r,c.g),c.b);c*=max(0.0,lum-.80)/max(lum,.001);}\n return vec4f(c,1);\n}\n@fragment fn blur(in:V)->@location(0) vec4f{\n let step=post.size.zw/vec2f(textureDimensions(inputTexture));\n var c=textureSampleLevel(inputTexture,texSampler,in.uv,0).rgb*.227027;\n c+=(textureSampleLevel(inputTexture,texSampler,in.uv+step*1.384615,0).rgb+textureSampleLevel(inputTexture,texSampler,in.uv-step*1.384615,0).rgb)*.316216;\n c+=(textureSampleLevel(inputTexture,texSampler,in.uv+step*3.230769,0).rgb+textureSampleLevel(inputTexture,texSampler,in.uv-step*3.230769,0).rgb)*.070270;\n return vec4f(c,1);\n}\n@group(0) @binding(3) var bloom0:texture_2d<f32>;\n@group(0) @binding(4) var bloom1:texture_2d<f32>;\n@group(0) @binding(5) var bloom2:texture_2d<f32>;\n@group(0) @binding(6) var bloom3:texture_2d<f32>;\nfn aces(c:vec3f)->vec3f{return clamp((c*(2.51*c+.03))/(c*(2.43*c+.59)+.14),vec3f(0),vec3f(1));}\n@fragment fn finish(in:V)->@location(0) vec4f{\n let uv=in.uv;let p=uv-.5;\n let chroma=p*dot(p,p)*.0009;\n var col=vec3f(textureSampleLevel(inputTexture,texSampler,uv+chroma,0).r,textureSampleLevel(inputTexture,texSampler,uv,0).g,textureSampleLevel(inputTexture,texSampler,uv-chroma,0).b);\n col+=textureSampleLevel(bloom0,texSampler,uv,0).rgb*.25;\n col+=textureSampleLevel(bloom1,texSampler,uv,0).rgb*.25;\n col+=textureSampleLevel(bloom2,texSampler,uv,0).rgb*.24;\n col+=textureSampleLevel(bloom3,texSampler,uv,0).rgb*.24;\n let vignette=1.0-dot(p*vec2f(.83,1.0),p*vec2f(.83,1.0))*.55;\n col=aces(col*1.30*vignette)*post.values.y;\n col=pow(col,vec3f(1.0/2.2));\n let hash=fract(sin(dot(floor(uv*post.size.xy),vec2f(12.9898,78.233))+floor(post.values.z*24)*.17)*43758.5453);\n col+=(hash-.5)*.0035;\n return vec4f(max(col,vec3f(0)),1);\n}\n","scene":"@group(0) @binding(1) var engraving: texture_2d<f32>;\n@group(0) @binding(2) var linearSampler: sampler;\n\nfn stars(rd:vec3f)->vec3f{\n var out=vec3f(0);let dir=rotateZ(rotateY(rd,.25),-.42);\n // Direction-space stars stay fixed in world space during camera motion.\n for(var j=0;j<3;j++) {\n  let scale=vec3f(210.0+f32(j)*97.0);\n  let p=dir*scale+u.camera.xyz*(.018+f32(j)*.012);let id=floor(p);let f=fract(p)-.5;\n  let h=hash31(id+f32(j)*7.13);let d=length(f);\n  let star=exp(-d*d*(170.0+f32(j)*80.0))*smoothstep(.925,.992,h);\n  out+=star*mix(vec3f(.64,.78,1.0),vec3f(1,.82,.66),h)*3.8;\n }\n let cloud=noise3(dir*4.2)*.65+noise3(dir*10.1)*.35;\n let band=exp(-pow(abs(dir.y+.12),2.0)*19.0);\n out+=vec3f(.034,.044,.072)*pow(cloud,3.0)*band;\n return out;\n}\nfn studio(rd:vec3f)->vec3f{\n let sky=mix(vec3f(.007,.009,.018),vec3f(.055,.061,.080),saturate(rd.y*.5+.5));\n let keyDirection=normalize(vec3f(-1.5,.75,1.35));\n let keyRight=normalize(cross(keyDirection,vec3f(0,1,0)));\n let keyUp=cross(keyRight,keyDirection);\n let key=(1-smoothstep(.042,.060,abs(dot(rd,keyRight))))*(1-smoothstep(.29,.35,abs(dot(rd,keyUp))))*smoothstep(.65,.8,dot(rd,keyDirection))*5.2;\n let strip=pow(max(dot(rd,normalize(vec3f(.80,.22,-.70))),0.0),100.0)*5.5;\n let overhead=pow(max(dot(rd,normalize(vec3f(-.1,1.0,.1))),0.0),32.0)*2.2;\n let soft=pow(max(dot(rd,normalize(vec3f(1.1,.7,1.2))),0.0),9.0)*.34;\n return sky+key*vec3f(.87,.94,1.0)+strip*vec3f(.39,.36,.9)+overhead*vec3f(.70,.83,1.0)+soft*vec3f(1.0,.81,.62);\n}\nfn atmosphere(ro:vec3f,rd:vec3f)->vec3f{\n let pc=vec3f(0,-18.45,-34);let pr=19.0;\n let sunDir=normalize(vec3f(.005,-.014+u.parameters.x*.116,-1));\n var color=stars(rd)*.68+vec3f(.0008,.0010,.0020);\n let angular=acos(clamp(dot(rd,sunDir),-.999999,.999999));\n color+=vec3f(1.0,.83,.53)*exp(-angular*angular*950.0)*(.25+u.parameters.x*2.0);\n color+=vec3f(1.0,.97,.81)*(1-smoothstep(.010,.013,angular))*7.0;\n let hit=sphereHit(ro,rd,pc,pr);\n if(hit.x>0.0){\n  let p=ro+rd*hit.x;let n=normalize(p-pc);let rim=pow(1.0-max(0.0,dot(n,-rd)),4.0);\n  let light=max(0.0,dot(n,sunDir));\n  let cloud=noise3(n*36.0)*.65+noise3(n*83.0)*.35;\n  color=vec3f(.0008,.0012,.0023)+vec3f(.014,.021,.032)*cloud*light;\n  color+=rim*vec3f(.15,.31,.54)*(.13+light*3.2);\n  color+=pow(rim,4.0)*vec3f(.8,.50,.20)*pow(max(dot(n,sunDir),0.0),.5)*u.parameters.x;\n } else {\n  let q=pc-ro;let closest=length(q-rd*max(dot(q,rd),0.0));\n  color+=vec3f(.18,.36,.65)*exp(-max(0.0,closest-pr)*15.0)*(.10+u.parameters.x*.5);\n }\n let moon=vec3f(0,4.8,-28);let mh=sphereHit(ro,rd,moon,1.65);\n if(mh.x>0.0 && (hit.x<0.0||mh.x<hit.x)) {\n  let n=normalize(ro+rd*mh.x-moon);let rim=pow(1-max(0.0,dot(n,-rd)),4.0);\n  let tex=noise3(n*32.0);\n  color=vec3f(.003,.0034,.004)*tex+vec3f(.29,.25,.18)*rim*.19;\n }\n // Very restrained anamorphic flare, not an opaque neon line.\n let flare=exp(-pow(rd.y-sunDir.y,2.0)*150000.0)*exp(-abs(rd.x-sunDir.x)*9.0);\n if(hit.x<0.0){color+=vec3f(.16,.25,.47)*flare*u.parameters.x*.6;}\n return color;\n}\nfn cylinder(p:vec3f,r:f32,h:f32)->f32 {\n let q=vec2f(length(p.xz)-r,abs(p.y)-h);return length(max(q,vec2f(0)))+min(max(q.x,q.y),0.0);\n}\nfn beveledCone(p:vec3f,bottom:f32,top:f32,h:f32,bevel:f32)->f32{\n let r=mix(bottom,top,saturate(p.y/(2*h)+.5));\n let q=vec2f(length(p.xz)-r,abs(p.y)-h);\n return length(max(q,vec2f(0)))+min(max(q.x,q.y),0.0)-bevel;\n}\nfn machinery(p:vec3f)->vec2f{\n let ex=u.forward.w;\n var d=beveledCone(p-vec3f(0,-.60+ex*.16,0),.915,.846,.178,.041);\n var mat=1.0;\n let foot=cylinder(p-vec3f(0,-.838,0),.942,.041)-.017;\n if(foot<d){d=foot;mat=2.0;}\n let lip=cylinder(p-vec3f(0,-.346+ex*.52,0),.853,.026)-.011;\n if(lip<d){d=lip;mat=1.0;}\n let led=length(vec2f(length(p.xz)-.847,p.y+.309-ex*.52))-.010;\n if(led<d){d=led;mat=3.0;}\n // Concept assembly: a separate substrate becomes visible only in the exploded shot.\n if(ex>.04){\n  let pcb=cylinder(p-vec3f(0,-.23+ex*.82,0),.74,.018)-.005;\n  if(pcb<d){d=pcb;mat=4.0;}\n  let disc=cylinder(p-vec3f(0,-.11+ex*1.13,0),.55,.010)-.005;\n  if(disc<d){d=disc;mat=5.0;}\n }\n return vec2f(d,mat);\n}\nfn machineryHit(ro:vec3f,rd:vec3f)->vec2f{\n let bounds=sphereHit(ro,rd,vec3f(0,-.21+u.forward.w*.4,0),1.50);\n if(bounds.y<0.0){return vec2f(-1.0);}\n var t=max(0.002,bounds.x);\n for(var i=0;i<76;i++) {\n  let d=machinery(ro+rd*t);\n  if(d.x<.0007*(1.0+t*.2)){return vec2f(t,d.y);}\n  t+=d.x*.72;\n  if(t>bounds.y){break;}\n }\n return vec2f(-1.0);\n}\nfn machineNormal(p:vec3f)->vec3f{\n // Tetrahedral SDF gradient: four evaluations instead of six.\n let a=vec3f(1,-1,-1)*.0015;let b=vec3f(-1,-1,1)*.0015;\n let c=vec3f(-1,1,-1)*.0015;let d=vec3f(1,1,1)*.0015;\n return normalize(a*machinery(p+a).x+b*machinery(p+b).x+c*machinery(p+c).x+d*machinery(p+d).x);\n}\nfn machineColor(p:vec3f,n:vec3f,rd:vec3f,material:f32)->vec3f{\n let nv=max(dot(n,-rd),.001);let refl=reflect(rd,n);\n let fres=.56+.44*pow(1.0-nv,5.0);\n let angle=atan2(p.x,p.z);\n let brush=.988+.012*sin(p.y*2500.0+noise3(p*31.0)*2.0);\n var metal=studio(refl)*mix(vec3f(.42,.45,.51),vec3f(.83,.87,.95),pow(1.0-nv,3.0))*fres*brush;\n metal+=vec3f(.034,.034,.041)*max(dot(n,normalize(vec3f(-2,3,4))),0.0);\n let seam=1.0-smoothstep(.002,.009,abs(p.y+.747-u.forward.w*.16));\n metal*=1.0-seam*.80;\n if(material>1.5 && material<2.5){metal*=.15;}\n if(material>2.5 && material<3.5){return vec3f(.45,.68,1.0)*3.6*u.up.w;}\n if(material>3.5 && material<4.5){\n  let r=length(p.xz);let a=atan2(p.z,p.x);\n  let tracks=pow(.5+.5*sin(r*120.0),25.0)*.45+pow(.5+.5*sin(a*26.0),60.0)*.65;\n  return mix(vec3f(.008,.021,.02),vec3f(.65,.40,.115)*(.4+max(n.y,0.0)*.5),saturate(tracks)) + studio(refl)*.13;\n }\n if(material>4.5){return vec3f(.12,.22,.42)*studio(refl)+vec3f(.05,.08,.14);}\n // The wordmark is an engraved texture in object space, not a floating label.\n let uv=vec2f(.5+angle*.88,.5-(p.y+.59-u.forward.w*.16)/.115);\n if(all(uv>vec2f(0))&&all(uv<vec2f(1))&&p.z>0.0){\n  let etch=textureSampleLevel(engraving,linearSampler,uv,0.0).r;\n  metal=mix(metal,vec3f(.25,.29,.37)+studio(refl)*.06,etch*.9);\n }\n let led=exp(-pow((p.y+.705-u.forward.w*.16)*420.0,2.0))*(1-smoothstep(.024,.044,abs(angle)));\n metal+=vec3f(.32,.65,1.0)*led*2.0;\n return metal;\n}\nfn energyVolume(ro:vec3f,rd:vec3f,near:f32,far:f32,steps:f32)->vec3f{\n let len=max(0.0,far-near);let stride=len/max(steps,1.0);\n var sum=vec3f(0);var trans=1.0;\n let t=u.resolution.z;let core=u.orb.xyz;\n let start=near+stride*.5;\n for(var j=0;j<64;j++) {\n  if(f32(j)>=steps||trans<.025){break;}\n  let pos=ro+rd*(start+f32(j)*stride);let raw=(pos-core)/u.orb.w;\n  let q=rotateY(raw,t*.12);let radial=length(q);\n  let n=noise3(q*5.2+vec3f(0,t*.04,0));\n  var n2=n;if(u.extra.x>.65){n2=noise3(q*12.1-vec3f(t*.02,0,0));}\n  let haze=pow(max(0.0,n*.7+n2*.3-.38),2.0)*3.0*(1-smoothstep(.72,1.0,radial));\n  var density=haze*.25;var emitted=mix(vec3f(.17,.04,.42),vec3f(.045,.13,.35),n)*haze*.28;\n  for(var k=0;k<3;k++){\n   let f=f32(k);var v=rotateZ(rotateX(q,.35+f*1.04+t*.025),f*.77+t*.05);\n   let rr=length(v.xz);let sn=v.z/max(rr,.00001);let cs=v.x/max(rr,.00001);\n   let sin2=2.0*sn*cs;let cos2=cs*cs-sn*sn;let sin3=sn*(3.0-4.0*sn*sn);let cos3=cs*(4.0*cs*cs-3.0);\n   let path=.49+f*.095+.04*(sin3*cos(t*.18+f*2.0)+cos3*sin(t*.18+f*2.0));\n   let torus=length(vec2f(rr-path,v.y*.85+.062*(sin2*cos(f-t*.1)+cos2*sin(f-t*.1))));\n   let variance=.00011+f*.000025;\n   let footprint=variance+stride*stride/12.0;\n   let filament=exp(-torus*torus/footprint)*sqrt(variance/footprint);\n   let shroud=exp(-torus*torus/.0020)*(.6+n2*.4);\n   let current=.34+.66*pow(.5+.5*(sin2*cos(f-t*(.8+f*.18))+cos2*sin(f-t*(.8+f*.18))),3.0);\n   let arc=pow(max(0.0,sin(v.x*43.0+v.z*31.0+t*(1.2+f*.4))),14.0)*shroud;\n   emitted+=vec3f(.28,.67,1.0)*arc*.85*u.extra.y;\n   emitted+=mix(vec3f(.080,.43,1.0),vec3f(.40,.20,.90),f*.44)*(filament*5.5+shroud*.28)*current;\n   density+=filament*.1+shroud*.055;\n  }\n  let heart=exp(-radial*radial/.0025);\n  emitted+=vec3f(.35,.69,1.0)*heart*4.5;\n  sum+=trans*emitted*stride*3.0*u.up.w;\n  trans*=exp(-density*stride*.72);\n }\n // A compact luminous source gives the trails a coherent centre.\n let d=length(cross(core-ro,rd));let nearest=dot(core-ro,rd);\n if(nearest>near && nearest<far){sum+=vec3f(.50,.83,1.0)*exp(-d*d/.0006)*1.3*u.up.w;}\n return sum;\n}\nfn glass(ro:vec3f,rd:vec3f,hit:vec2f,reflectionOnly:bool)->vec3f{\n let p=ro+rd*hit.x;let n=normalize(p-u.orb.xyz);\n let nv=max(0.0,dot(n,-rd));let fres=.035+.965*pow(1.0-nv,5.0);\n let inDir=refract(rd,n,1.0/1.46);\n let inStart=p+inDir*.002;let second=sphereHit(inStart,inDir,u.orb.xyz,u.orb.w);\n let exitPoint=inStart+inDir*max(second.y,0.0);let exitN=normalize(exitPoint-u.orb.xyz);\n let outDir=refract(inDir,-exitN,1.46);\n var backdrop=studio(normalize(outDir+vec3f(.00001)))*.20+stars(normalize(outDir+vec3f(.00001)))*.25;\n let shellAbsorb=exp(-vec3f(.09,.055,.015)*max(second.y,0.0));\n var steps=u.parameters.z;\n if(reflectionOnly){steps=12.0;}\n let inner=energyVolume(inStart,inDir,0,max(second.y,0.0),steps);\n var col=(backdrop*shellAbsorb+inner)*(1-fres*.80)+studio(reflect(rd,n))*fres;\n // A second, slightly displaced interface gives the glass shell a visible thickness.\n let rim=pow(1-nv,11.0);\n col+=rim*vec3f(.21,.31,.59)*.44;\n col+=pow(max(dot(reflect(rd,n),normalize(vec3f(-1.5,.75,1.35))),0.0),240.0)*vec3f(.7,.83,1.0)*2.0;\n return col;\n}\nfn product(ro:vec3f,rd:vec3f,reflected:bool)->vec4f{\n let ball=sphereHit(ro,rd,u.orb.xyz,u.orb.w);\n let solid=machineryHit(ro,rd);\n if(solid.x>0.0 && (ball.x<0.0||solid.x<ball.x)){\n  let p=ro+rd*solid.x;return vec4f(machineColor(p,machineNormal(p),rd,solid.y),solid.x);\n }\n if(ball.x>0.0){return vec4f(glass(ro,rd,ball,reflected),ball.x);}\n return vec4f(0,0,0,-1);\n}\nfn holography(ro:vec3f,rd:vec3f,sceneDepth:f32)->vec3f{\n let strength=u.extra.y*smoothstep(31.0,36.0,u.resolution.z);var light=vec3f(0);\n if(strength<=0.0){return light;}\n for(var i=0;i<2;i++){\n  let k=f32(i);let normal=normalize(vec3f(.15*k,1.0,.22*k));\n  let center=u.orb.xyz+vec3f(0,-.90+k*1.0,0);let denom=dot(rd,normal);\n  if(abs(denom)>.0001){\n   let distance=dot(center-ro,normal)/denom;\n   if(distance>0.0 && distance<sceneDepth){\n    let p=ro+rd*distance-center;let radius=length(p);let angle=atan2(p.z,p.x);\n    let target=1.40+k*.35;let footprint=max(.004,distance*u.camera.w/u.resolution.y*1.4);\n    let ring=exp(-pow((radius-target)/footprint,2.0));\n    let dash=smoothstep(.05,.22,sin(angle*(22.0+k*9.0)+u.resolution.z*(.24-k*.43)));\n    let ticks=pow(max(0.0,cos(angle*64.0)),28.0)*(1.0-smoothstep(.016,.043,abs(radius-target+.05)));\n    let breathing=.65+.35*sin(u.resolution.z*.65+k);\n    light+=mix(vec3f(.055,.35,.78),vec3f(.40,.23,.08),k*.5)*(ring*dash+ticks*.55)*strength*breathing;\n   }\n  }\n }\n return light;\n}\n@fragment fn sceneFragment(in:VertexOut)->@location(0) vec4f{\n let ro=u.camera.xyz;let rd=direction(in.uv);\n if(u.right.w<.5){return vec4f(atmosphere(ro,rd),1000.0);}\n if(u.right.w>1.5){\n  let h=sphereHit(ro,rd,u.orb.xyz,u.orb.w*1.28);\n  var col=energyVolume(ro,rd,max(h.x,0.0),max(h.y,0.0),u.parameters.z+8.0);\n  col+=stars(rd)*.14;return vec4f(col,max(h.y,.01));\n }\n let hit=product(ro,rd,false);\n var col=vec3f(.0017,.0022,.0034)+stars(rd)*.055;var depth=1000.0;\n if(hit.w>0.0){col=hit.rgb;depth=hit.w;}\n let ground=(-.906-ro.y)/rd.y;\n if(ground>0.0 && (hit.w<0.0||ground<hit.w)){\n  depth=ground;\n  let p=ro+rd*ground;let n=vec3f(0,1,0);let refl=reflect(rd,n);\n  let rr=length(p.xz);let fres=.08+.70*pow(1-max(dot(n,-rd),0.0),5.0);\n  let reflection=product(p+vec3f(0,.005,0),refl,true);\n  let floorNoise=noise3(p*7.0)*.65+noise3(p*27.0)*.35;\n  col=vec3f(.004,.005,.008)+studio(refl)*.018*(.8+floorNoise*.2);\n  if(reflection.w>0.0){col+=reflection.rgb*fres*.67;}\n  let halo=exp(-rr*rr*1.35)*(.55+.45*floorNoise);\n  col+=vec3f(.024,.055,.14)*halo*u.up.w;\n  let contact=1.0-.9*exp(-rr*rr*1.7);col*=contact+.10;\n  col=mix(vec3f(.0017,.0022,.0034)+stars(rd)*.045,col,smoothstep(.0,.17,abs(rd.y)));\n }\n col+=holography(ro,rd,depth);\n // Alpha is the distance along this ray, consumed by the volumetric pass.\n return vec4f(col,min(depth,1000.0));\n}\n","volumetric":"// Evaluated at half internal resolution. Uses scene alpha as linear ray distance.\n@group(1) @binding(0) var fogDepth:texture_2d<f32>;\n@group(1) @binding(1) var fogSampler:sampler;\n@fragment fn fogFragment(in:VertexOut)->@location(0) vec4f{\n let scene=textureSampleLevel(fogDepth,fogSampler,in.uv,0);\n let ro=u.camera.xyz;let rd=direction(in.uv);let center=u.orb.xyz;\n let bounds=sphereHit(ro,rd,center,4.4);\n let near=max(0.0,bounds.x);let far=min(min(scene.a,bounds.y),18.0);\n if(far<=near||u.right.w<.5||u.extra.y<=0){return vec4f(0,0,0,scene.a);}\n let steps=u.extra.z;let step=(far-near)/max(steps,1.0);var sum=vec3f(0);var trans=1.0;\n // Static interleaved sampling is time-addressable and cannot ghost across cuts.\n let jitter=fract(52.9829189*fract(dot(floor(in.position.xy),vec2f(.06711056,.00583715))));\n let time=u.resolution.z;\n for(var i=0;i<24;i++){\n  if(f32(i)>=steps){break;}\n  let d=near+(f32(i)+jitter)*step;let p=ro+rd*d;let q=p-center;\n  let r2=dot(q,q);let inside=smoothstep(1.0,1.6,r2);\n  let strata=.65+.35*sin(p.y*2.3+sin(p.x*1.2+time*.11));\n  let density=.026*exp(-r2*.16)*strata*inside;\n  let cone1=exp(-pow(length(q.xz)-abs(q.y)*.37,2)*30)*exp(-abs(q.y)*.48);\n  let cone2=exp(-pow(q.x*.45+q.y*.86+q.z*.27,2)*22)*exp(-r2*.32);\n  let toward=normalize(center-p+vec3f(.0001));let phase=.30+1.7*pow(max(dot(rd,toward),0.0),5);\n  let light=vec3f(.055,.22,.55)*(1.1+cone1*6.5)+vec3f(.28,.09,.4)*cone2*2.0;\n  sum+=trans*density*light*phase*step*u.up.w;trans*=exp(-density*step);\n }\n return vec4f(sum*u.extra.y,scene.a);\n}\n"};
+const INLINE_COMPAT="#version 300 es\nprecision highp float;\nprecision highp int;\nuniform sampler2D engraving;\nin vec2 vUv;\nout vec4 fragColor;\nstruct Uniforms{vec4 resolution;vec4 camera;vec4 right;vec4 up;vec4 forward;vec4 parameters;vec4 orb;vec4 extra;};\nuniform Uniforms u;\nconst float PI=3.14159265359;\nfloat saturate(float x){return clamp(x,0.0,1.0);}\nfloat hash31(vec3 p){vec3 q=fract(p*.1031);q+=vec3(dot(q,q.yzx+33.33));return fract((q.x+q.y)*q.z);}\nfloat hash11(float p){return fract(sin(p*127.1)*43758.5453);}\nvec3 rotateX(vec3 p,float a){float c=cos(a);float s=sin(a);return vec3(p.x,c*p.y-s*p.z,s*p.y+c*p.z);}\nvec3 rotateY(vec3 p,float a){float c=cos(a);float s=sin(a);return vec3(c*p.x+s*p.z,p.y,-s*p.x+c*p.z);}\nvec3 rotateZ(vec3 p,float a){float c=cos(a);float s=sin(a);return vec3(c*p.x-s*p.y,s*p.x+c*p.y,p.z);}\nfloat noise3(vec3 p){\n vec3 i=floor(p);vec3 f=fract(p);vec3 s=f*f*(3.0-2.0*f);\n return mix(mix(mix(hash31(i),hash31(i+vec3(1.0,0.0,0.0)),s.x),mix(hash31(i+vec3(0.0,1.0,0.0)),hash31(i+vec3(1.0,1.0,0.0)),s.x),s.y),\n mix(mix(hash31(i+vec3(0.0,0.0,1.0)),hash31(i+vec3(1.0,0.0,1.0)),s.x),mix(hash31(i+vec3(0.0,1.0,1.0)),hash31(i+vec3(1.0,1.0,1.0)),s.x),s.y),s.z);\n}\nvec2 sphereHit(vec3 ro,vec3 rd,vec3 center,float r){\n vec3 q=ro-center;float b=dot(q,rd);float h=b*b-dot(q,q)+r*r;\n if(h<0.0){return vec2(-1.0);}\n float s=sqrt(h);return vec2(-b-s,-b+s);\n}\nvec3 direction(vec2 uv){\n vec2 q=vec2(uv.x*2.0-1.0,1.0-uv.y*2.0);\n return normalize(u.forward.xyz+(q.x*u.resolution.w*u.right.xyz+q.y*u.up.xyz)*u.camera.w);\n}\nvec3 stars(vec3 rd){\n vec3 accumulated=vec3(0.0);vec3 dir=rotateZ(rotateY(rd,.25),-.42);\n // Direction-space stars stay fixed in world space during camera motion.\n for(int j=0;j<3;j++) {\n  vec3 scale=vec3(210.0+float(j)*97.0);\n  vec3 p=dir*scale+u.camera.xyz*(.018+float(j)*.012);vec3 id=floor(p);vec3 f=fract(p)-.5;\n  float h=hash31(id+float(j)*7.13);float d=length(f);\n  float star=exp(-d*d*(170.0+float(j)*80.0))*smoothstep(.925,.992,h);\n  accumulated+=star*mix(vec3(.64,.78,1.0),vec3(1.0,.82,.66),h)*3.8;\n }\n float cloud=noise3(dir*4.2)*.65+noise3(dir*10.1)*.35;\n float band=exp(-pow(abs(dir.y+.12),2.0)*19.0);\n accumulated+=vec3(.034,.044,.072)*pow(cloud,3.0)*band;\n return accumulated;\n}\nvec3 studio(vec3 rd){\n vec3 sky=mix(vec3(.007,.009,.018),vec3(.055,.061,.080),saturate(rd.y*.5+.5));\n vec3 keyDirection=normalize(vec3(-1.5,.75,1.35));\n vec3 keyRight=normalize(cross(keyDirection,vec3(0.0,1.0,0.0)));\n vec3 keyUp=cross(keyRight,keyDirection);\n float key=(1.0-smoothstep(.042,.060,abs(dot(rd,keyRight))))*(1.0-smoothstep(.29,.35,abs(dot(rd,keyUp))))*smoothstep(.65,.8,dot(rd,keyDirection))*5.2;\n float strip=pow(max(dot(rd,normalize(vec3(.80,.22,-.70))),0.0),100.0)*5.5;\n float overhead=pow(max(dot(rd,normalize(vec3(-.1,1.0,.1))),0.0),32.0)*2.2;\n float soft=pow(max(dot(rd,normalize(vec3(1.1,.7,1.2))),0.0),9.0)*.34;\n return sky+key*vec3(.87,.94,1.0)+strip*vec3(.39,.36,.9)+overhead*vec3(.70,.83,1.0)+soft*vec3(1.0,.81,.62);\n}\nvec3 atmosphere(vec3 ro,vec3 rd){\n vec3 pc=vec3(0.0,-18.45,-34.0);float pr=19.0;\n vec3 sunDir=normalize(vec3(.005,-.014+u.parameters.x*.116,-1.0));\n vec3 color=stars(rd)*.68+vec3(.0008,.0010,.0020);\n float angular=acos(clamp(dot(rd,sunDir),-.999999,.999999));\n color+=vec3(1.0,.83,.53)*exp(-angular*angular*950.0)*(.25+u.parameters.x*2.0);\n color+=vec3(1.0,.97,.81)*(1.0-smoothstep(.010,.013,angular))*7.0;\n vec2 hit=sphereHit(ro,rd,pc,pr);\n if(hit.x>0.0){\n  vec3 p=ro+rd*hit.x;vec3 n=normalize(p-pc);float rim=pow(1.0-max(0.0,dot(n,-rd)),4.0);\n  float light=max(0.0,dot(n,sunDir));\n  float cloud=noise3(n*36.0)*.65+noise3(n*83.0)*.35;\n  color=vec3(.0008,.0012,.0023)+vec3(.014,.021,.032)*cloud*light;\n  color+=rim*vec3(.15,.31,.54)*(.13+light*3.2);\n  color+=pow(rim,4.0)*vec3(.8,.50,.20)*pow(max(dot(n,sunDir),0.0),.5)*u.parameters.x;\n } else {\n  vec3 q=pc-ro;float closest=length(q-rd*max(dot(q,rd),0.0));\n  color+=vec3(.18,.36,.65)*exp(-max(0.0,closest-pr)*15.0)*(.10+u.parameters.x*.5);\n }\n vec3 moon=vec3(0.0,4.8,-28.0);vec2 mh=sphereHit(ro,rd,moon,1.65);\n if(mh.x>0.0 && (hit.x<0.0||mh.x<hit.x)) {\n  vec3 n=normalize(ro+rd*mh.x-moon);float rim=pow(1.0-max(0.0,dot(n,-rd)),4.0);\n  float tex=noise3(n*32.0);\n  color=vec3(.003,.0034,.004)*tex+vec3(.29,.25,.18)*rim*.19;\n }\n // Very restrained anamorphic flare, not an opaque neon line.\n float flare=exp(-pow(rd.y-sunDir.y,2.0)*150000.0)*exp(-abs(rd.x-sunDir.x)*9.0);\n if(hit.x<0.0){color+=vec3(.16,.25,.47)*flare*u.parameters.x*.6;}\n return color;\n}\nfloat cylinder(vec3 p,float r,float h){\n vec2 q=vec2(length(p.xz)-r,abs(p.y)-h);return length(max(q,vec2(0.0)))+min(max(q.x,q.y),0.0);\n}\nfloat beveledCone(vec3 p,float bottom,float top,float h,float bevel){\n float r=mix(bottom,top,saturate(p.y/(2.0*h)+.5));\n vec2 q=vec2(length(p.xz)-r,abs(p.y)-h);\n return length(max(q,vec2(0.0)))+min(max(q.x,q.y),0.0)-bevel;\n}\nvec2 machinery(vec3 p){\n float ex=u.forward.w;\n float d=beveledCone(p-vec3(0.0,-.60+ex*.16,0.0),.915,.846,.178,.041);\n float mat=1.0;\n float foot=cylinder(p-vec3(0.0,-.838,0.0),.942,.041)-.017;\n if(foot<d){d=foot;mat=2.0;}\n float lip=cylinder(p-vec3(0.0,-.346+ex*.52,0.0),.853,.026)-.011;\n if(lip<d){d=lip;mat=1.0;}\n float led=length(vec2(length(p.xz)-.847,p.y+.309-ex*.52))-.010;\n if(led<d){d=led;mat=3.0;}\n // Concept assembly: a separate substrate becomes visible only in the exploded shot.\n if(ex>.04){\n  float pcb=cylinder(p-vec3(0.0,-.23+ex*.82,0.0),.74,.018)-.005;\n  if(pcb<d){d=pcb;mat=4.0;}\n  float disc=cylinder(p-vec3(0.0,-.11+ex*1.13,0.0),.55,.010)-.005;\n  if(disc<d){d=disc;mat=5.0;}\n }\n return vec2(d,mat);\n}\nvec2 machineryHit(vec3 ro,vec3 rd){\n vec2 bounds=sphereHit(ro,rd,vec3(0.0,-.21+u.forward.w*.4,0.0),1.50);\n if(bounds.y<0.0){return vec2(-1.0);}\n float t=max(0.002,bounds.x);\n for(int i=0;i<76;i++) {\n  vec2 d=machinery(ro+rd*t);\n  if(d.x<.0007*(1.0+t*.2)){return vec2(t,d.y);}\n  t+=d.x*.72;\n  if(t>bounds.y){break;}\n }\n return vec2(-1.0);\n}\nvec3 machineNormal(vec3 p){\n // Tetrahedral SDF gradient: four evaluations instead of six.\n vec3 a=vec3(1.0,-1.0,-1.0)*.0015;vec3 b=vec3(-1.0,-1.0,1.0)*.0015;\n vec3 c=vec3(-1.0,1.0,-1.0)*.0015;vec3 d=vec3(1.0,1.0,1.0)*.0015;\n return normalize(a*machinery(p+a).x+b*machinery(p+b).x+c*machinery(p+c).x+d*machinery(p+d).x);\n}\nvec3 machineColor(vec3 p,vec3 n,vec3 rd,float material){\n float nv=max(dot(n,-rd),.001);vec3 refl=reflect(rd,n);\n float fres=.56+.44*pow(1.0-nv,5.0);\n float angle=atan(p.x,p.z);\n float brush=.988+.012*sin(p.y*2500.0+noise3(p*31.0)*2.0);\n vec3 metal=studio(refl)*mix(vec3(.42,.45,.51),vec3(.83,.87,.95),pow(1.0-nv,3.0))*fres*brush;\n metal+=vec3(.034,.034,.041)*max(dot(n,normalize(vec3(-2.0,3.0,4.0))),0.0);\n float seam=1.0-smoothstep(.002,.009,abs(p.y+.747-u.forward.w*.16));\n metal*=1.0-seam*.80;\n if(material>1.5 && material<2.5){metal*=.15;}\n if(material>2.5 && material<3.5){return vec3(.45,.68,1.0)*3.6*u.up.w;}\n if(material>3.5 && material<4.5){\n  float r=length(p.xz);float a=atan(p.z,p.x);\n  float tracks=pow(.5+.5*sin(r*120.0),25.0)*.45+pow(.5+.5*sin(a*26.0),60.0)*.65;\n  return mix(vec3(.008,.021,.02),vec3(.65,.40,.115)*(.4+max(n.y,0.0)*.5),saturate(tracks)) + studio(refl)*.13;\n }\n if(material>4.5){return vec3(.12,.22,.42)*studio(refl)+vec3(.05,.08,.14);}\n // The wordmark is an engraved texture in object space, not a floating label.\n vec2 uv=vec2(.5+angle*.88,.5-(p.y+.59-u.forward.w*.16)/.115);\n if(all(greaterThan(uv,vec2(0.0)))&&all(lessThan(uv,vec2(1.0)))&&p.z>0.0){\n  float etch=textureLod(engraving,uv,0.0).r;\n  metal=mix(metal,vec3(.25,.29,.37)+studio(refl)*.06,etch*.9);\n }\n float led=exp(-pow((p.y+.705-u.forward.w*.16)*420.0,2.0))*(1.0-smoothstep(.024,.044,abs(angle)));\n metal+=vec3(.32,.65,1.0)*led*2.0;\n return metal;\n}\nvec3 energyVolume(vec3 ro,vec3 rd,float near,float far,float steps){\n float len=max(0.0,far-near);float stride=len/max(steps,1.0);\n vec3 sum=vec3(0.0);float trans=1.0;\n float t=u.resolution.z;vec3 core=u.orb.xyz;\n float start=near+stride*.5;\n for(int j=0;j<64;j++) {\n  if(float(j)>=steps||trans<.025){break;}\n  vec3 pos=ro+rd*(start+float(j)*stride);vec3 raw=(pos-core)/u.orb.w;\n  vec3 q=rotateY(raw,t*.12);float radial=length(q);\n  float n=noise3(q*5.2+vec3(0.0,t*.04,0.0));\n  float n2=n;if(u.extra.x>.65){n2=noise3(q*12.1-vec3(t*.02,0.0,0.0));}\n  float haze=pow(max(0.0,n*.7+n2*.3-.38),2.0)*3.0*(1.0-smoothstep(.72,1.0,radial));\n  float density=haze*.25;vec3 emitted=mix(vec3(.17,.04,.42),vec3(.045,.13,.35),n)*haze*.28;\n  for(int k=0;k<3;k++){\n   float f=float(k);vec3 v=rotateZ(rotateX(q,.35+f*1.04+t*.025),f*.77+t*.05);\n   float rr=length(v.xz);float sn=v.z/max(rr,.00001);float cs=v.x/max(rr,.00001);\n   float sin2=2.0*sn*cs;float cos2=cs*cs-sn*sn;float sin3=sn*(3.0-4.0*sn*sn);float cos3=cs*(4.0*cs*cs-3.0);\n   float path=.49+f*.095+.04*(sin3*cos(t*.18+f*2.0)+cos3*sin(t*.18+f*2.0));\n   float torus=length(vec2(rr-path,v.y*.85+.062*(sin2*cos(f-t*.1)+cos2*sin(f-t*.1))));\n   float variance=.00011+f*.000025;\n   float footprint=variance+stride*stride/12.0;\n   float filament=exp(-torus*torus/footprint)*sqrt(variance/footprint);\n   float shroud=exp(-torus*torus/.0020)*(.6+n2*.4);\n   float current=.34+.66*pow(.5+.5*(sin2*cos(f-t*(.8+f*.18))+cos2*sin(f-t*(.8+f*.18))),3.0);\n   float arc=pow(max(0.0,sin(v.x*43.0+v.z*31.0+t*(1.2+f*.4))),14.0)*shroud;\n   emitted+=vec3(.28,.67,1.0)*arc*.85*u.extra.y;\n   emitted+=mix(vec3(.080,.43,1.0),vec3(.40,.20,.90),f*.44)*(filament*5.5+shroud*.28)*current;\n   density+=filament*.1+shroud*.055;\n  }\n  float heart=exp(-radial*radial/.0025);\n  emitted+=vec3(.35,.69,1.0)*heart*4.5;\n  sum+=trans*emitted*stride*3.0*u.up.w;\n  trans*=exp(-density*stride*.72);\n }\n // A compact luminous source gives the trails a coherent centre.\n float d=length(cross(core-ro,rd));float nearest=dot(core-ro,rd);\n if(nearest>near && nearest<far){sum+=vec3(.50,.83,1.0)*exp(-d*d/.0006)*1.3*u.up.w;}\n return sum;\n}\nvec3 glass(vec3 ro,vec3 rd,vec2 hit,bool reflectionOnly){\n vec3 p=ro+rd*hit.x;vec3 n=normalize(p-u.orb.xyz);\n float nv=max(0.0,dot(n,-rd));float fres=.035+.965*pow(1.0-nv,5.0);\n vec3 inDir=refract(rd,n,1.0/1.46);\n vec3 inStart=p+inDir*.002;vec2 second=sphereHit(inStart,inDir,u.orb.xyz,u.orb.w);\n vec3 exitPoint=inStart+inDir*max(second.y,0.0);vec3 exitN=normalize(exitPoint-u.orb.xyz);\n vec3 outDir=refract(inDir,-exitN,1.46);\n vec3 backdrop=studio(normalize(outDir+vec3(.00001)))*.20+stars(normalize(outDir+vec3(.00001)))*.25;\n vec3 shellAbsorb=exp(-vec3(.09,.055,.015)*max(second.y,0.0));\n float steps=u.parameters.z;\n if(reflectionOnly){steps=12.0;}\n vec3 inner=energyVolume(inStart,inDir,0.0,max(second.y,0.0),steps);\n vec3 col=(backdrop*shellAbsorb+inner)*(1.0-fres*.80)+studio(reflect(rd,n))*fres;\n // A second, slightly displaced interface gives the glass shell a visible thickness.\n float rim=pow(1.0-nv,11.0);\n col+=rim*vec3(.21,.31,.59)*.44;\n col+=pow(max(dot(reflect(rd,n),normalize(vec3(-1.5,.75,1.35))),0.0),240.0)*vec3(.7,.83,1.0)*2.0;\n return col;\n}\nvec4 product(vec3 ro,vec3 rd,bool reflected){\n vec2 ball=sphereHit(ro,rd,u.orb.xyz,u.orb.w);\n vec2 solid=machineryHit(ro,rd);\n if(solid.x>0.0 && (ball.x<0.0||solid.x<ball.x)){\n  vec3 p=ro+rd*solid.x;return vec4(machineColor(p,machineNormal(p),rd,solid.y),solid.x);\n }\n if(ball.x>0.0){return vec4(glass(ro,rd,ball,reflected),ball.x);}\n return vec4(0.0,0.0,0.0,-1.0);\n}\nvec3 holography(vec3 ro,vec3 rd,float sceneDepth){\n float strength=u.extra.y*smoothstep(31.0,36.0,u.resolution.z);vec3 light=vec3(0.0);\n if(strength<=0.0){return light;}\n for(int i=0;i<2;i++){\n  float k=float(i);vec3 normal=normalize(vec3(.15*k,1.0,.22*k));\n  vec3 center=u.orb.xyz+vec3(0.0,-.90+k*1.0,0.0);float denom=dot(rd,normal);\n  if(abs(denom)>.0001){\n   float distance=dot(center-ro,normal)/denom;\n   if(distance>0.0 && distance<sceneDepth){\n    vec3 p=ro+rd*distance-center;float radius=length(p);float angle=atan(p.z,p.x);\n    float target=1.40+k*.35;float footprint=max(.004,distance*u.camera.w/u.resolution.y*1.4);\n    float ring=exp(-pow((radius-target)/footprint,2.0));\n    float dash=smoothstep(.05,.22,sin(angle*(22.0+k*9.0)+u.resolution.z*(.24-k*.43)));\n    float ticks=pow(max(0.0,cos(angle*64.0)),28.0)*(1.0-smoothstep(.016,.043,abs(radius-target+.05)));\n    float breathing=.65+.35*sin(u.resolution.z*.65+k);\n    light+=mix(vec3(.055,.35,.78),vec3(.40,.23,.08),k*.5)*(ring*dash+ticks*.55)*strength*breathing;\n   }\n  }\n }\n return light;\n}\nvec4 sceneFragment(){\n vec3 ro=u.camera.xyz;vec3 rd=direction(vUv);\n if(u.right.w<.5){return vec4(atmosphere(ro,rd),1000.0);}\n if(u.right.w>1.5){\n  vec2 h=sphereHit(ro,rd,u.orb.xyz,u.orb.w*1.28);\n  vec3 col=energyVolume(ro,rd,max(h.x,0.0),max(h.y,0.0),u.parameters.z+8.0);\n  col+=stars(rd)*.14;return vec4(col,max(h.y,.01));\n }\n vec4 hit=product(ro,rd,false);\n vec3 col=vec3(.0017,.0022,.0034)+stars(rd)*.055;float depth=1000.0;\n if(hit.w>0.0){col=hit.rgb;depth=hit.w;}\n float ground=(-.906-ro.y)/rd.y;\n if(ground>0.0 && (hit.w<0.0||ground<hit.w)){\n  depth=ground;\n  vec3 p=ro+rd*ground;vec3 n=vec3(0.0,1.0,0.0);vec3 refl=reflect(rd,n);\n  float rr=length(p.xz);float fres=.08+.70*pow(1.0-max(dot(n,-rd),0.0),5.0);\n  vec4 reflection=product(p+vec3(0.0,.005,0.0),refl,true);\n  float floorNoise=noise3(p*7.0)*.65+noise3(p*27.0)*.35;\n  col=vec3(.004,.005,.008)+studio(refl)*.018*(.8+floorNoise*.2);\n  if(reflection.w>0.0){col+=reflection.rgb*fres*.67;}\n  float halo=exp(-rr*rr*1.35)*(.55+.45*floorNoise);\n  col+=vec3(.024,.055,.14)*halo*u.up.w;\n  float contact=1.0-.9*exp(-rr*rr*1.7);col*=contact+.10;\n  col=mix(vec3(.0017,.0022,.0034)+stars(rd)*.045,col,smoothstep(.0,.17,abs(rd.y)));\n }\n col+=holography(ro,rd,depth);\n // Alpha is the distance along this ray, consumed by the volumetric pass.\n return vec4(col,min(depth,1000.0));\n}\nvoid main(){fragColor=sceneFragment();}\n";
+
+// -------- rendering/quality.js --------
+/** Quality budgets are independent from output size: typography/capture stay sharp. */
+const CINEMA_QUALITIES = Object.freeze({
+  preview: Object.freeze({pixels:580_000,steps:18,particles:4096,sceneScale:.78,bloomLevels:3,fogScale:.5,fogSteps:8}),
+  balanced: Object.freeze({pixels:1_300_000,steps:26,particles:12288,sceneScale:.85,bloomLevels:4,fogScale:.5,fogSteps:12}),
+  cinema: Object.freeze({pixels:2_100_000,steps:36,particles:24576,sceneScale:.92,bloomLevels:5,fogScale:.5,fogSteps:16}),
+  ultra: Object.freeze({pixels:8_300_000,steps:48,particles:32768,sceneScale:1,bloomLevels:5,fogScale:.5,fogSteps:20})
+});
+const CINEMA_LOOKS = Object.freeze({
+  clean: Object.freeze({bloom:.50,streak:0,fog:0,intensity:0,exposure:1.25}),
+  cinematic: Object.freeze({bloom:.72,streak:.34,fog:.85,intensity:.75,exposure:1.22}),
+  odyssey: Object.freeze({bloom:.90,streak:.62,fog:1.15,intensity:1.2,exposure:1.16})
+});
+function evenSize(width,height,scale=1,limit=16384){
+  if(![width,height,scale,limit].every(Number.isFinite)||width<=0||height<=0||scale<=0||limit<2)throw new RangeError('Invalid render extent.');
+  const s=Math.min(scale,limit/width,limit/height);
+  return [Math.max(2,Math.floor(width*s/2)*2),Math.max(2,Math.floor(height*s/2)*2)];
+}
+/** Discrete levels + hysteresis prevent per-frame texture churn and quality pumping. */
+class AdaptiveQuality {
+  constructor({targetMs=16.67,minScale=.55,maxScale=1,cooldownMs=1800}={}){
+    if(!(targetMs>0&&minScale>0&&minScale<=maxScale&&maxScale<=1&&cooldownMs>=0))throw new RangeError('Invalid adaptive quality budget.');
+    Object.assign(this,{targetMs,minScale,maxScale,cooldownMs});this.reset();
+  }
+  reset(){this.scale=this.maxScale;this.average=0;this.samples=0;this.slow=0;this.fast=0;this.lastChange=-Infinity;}
+  observe(ms,now,{locked=false}={}){
+    if(locked||!Number.isFinite(ms)||ms<=0||ms>250||!Number.isFinite(now))return false;
+    this.average=this.samples++?this.average*.9+ms*.1:ms;
+    if(this.samples<12)return false;
+    this.slow=this.average>this.targetMs*1.18?this.slow+1:0;
+    this.fast=this.average<this.targetMs*.67?this.fast+1:0;
+    if(now-this.lastChange<this.cooldownMs)return false;
+    let next=this.scale;
+    if(this.slow>=8)next=Math.max(this.minScale,Math.round((this.scale-.1)*100)/100);
+    else if(this.fast>=90)next=Math.min(this.maxScale,Math.round((this.scale+.05)*100)/100);
+    if(next===this.scale)return false;
+    this.scale=next;this.lastChange=now;this.slow=this.fast=0;return true;
+  }
+}
+
+// -------- rendering/target-pool.js --------
+const FORMAT_BYTES=Object.freeze({rgba16float:8,rgba8unorm:4,bgra8unorm:4,r32float:4,rg16float:4});
+/** Descriptor-keyed pool. Lease objects cache views; bounded LRU idle storage. */
+class RenderTargetPool {
+  constructor(device,{maxIdleBytes=48*1024*1024}={}){
+    this.device=device;this.maxIdleBytes=maxIdleBytes;this.free=[];this.live=new Set();
+    this.created=0;this.reused=0;this.destroyed=0;this.idleBytes=0;this.liveBytes=0;this.disposed=false;
+  }
+  acquire({width,height,format='rgba16float',usage,label='Cinematic target'}){
+    if(this.disposed)throw new Error('Render target pool is disposed.');
+    if(!Number.isInteger(width)||!Number.isInteger(height)||width<1||height<1||!FORMAT_BYTES[format]||!usage)throw new RangeError('Invalid render target descriptor.');
+    const key=`${width}/${height}/${format}/${usage}`;
+    const i=this.free.findIndex(t=>t.key===key);let target;
+    if(i>=0){target=this.free.splice(i,1)[0];this.idleBytes-=target.bytes;this.reused++;}
+    else {
+      const texture=this.device.createTexture({label,size:[width,height],format,usage});
+      target={key,width,height,format,texture,view:texture.createView(),bytes:width*height*FORMAT_BYTES[format],owner:this};this.created++;
+    }
+    this.live.add(target);this.liveBytes+=target.bytes;return target;
+  }
+  release(target){
+    if(target?.owner!==this||!this.live.delete(target))throw new Error('Foreign or already released render target.');
+    this.liveBytes-=target.bytes;this.free.push(target);this.idleBytes+=target.bytes;this.trim();
+  }
+  trim(){while(this.idleBytes>this.maxIdleBytes&&this.free.length){const t=this.free.shift();this.idleBytes-=t.bytes;t.texture.destroy();this.destroyed++;}}
+  get stats(){return {created:this.created,reused:this.reused,destroyed:this.destroyed,live:this.live.size,idle:this.free.length,liveBytes:this.liveBytes,idleBytes:this.idleBytes};}
+  dispose(){if(this.disposed)return;this.disposed=true;for(const t of [...this.live,...this.free]){t.texture.destroy();this.destroyed++;}this.live.clear();this.free=[];this.liveBytes=this.idleBytes=0;}
+}
+
+// -------- rendering/frame-graph.js --------
+/** Small explicit frame graph. Logical resource versions may alias a physical target. */
+class FrameGraph {
+  constructor(imports=[]){this.imports=new Set(imports);this.nodes=[];this.order=null;}
+  add(name,{reads=[],writes=[],after=[],run}){
+    if(this.order)throw new Error('Cannot mutate a compiled frame graph.');
+    if(this.nodes.some(n=>n.name===name)||typeof run!=='function')throw new Error(`Invalid/duplicate pass: ${name}`);
+    if(reads.some(r=>writes.includes(r)))throw new Error('Use versioned logical resources for read/write passes.');
+    this.nodes.push({name,reads,writes,after,run});return this;
+  }
+  compile(){
+    const producers=new Map(),byName=new Map(this.nodes.map(n=>[n.name,n]));
+    for(const n of this.nodes)for(const w of n.writes){if(producers.has(w)||this.imports.has(w))throw new Error(`Duplicate writer: ${w}`);producers.set(w,n);}
+    const visited=new Set(),active=new Set(),order=[];
+    const visit=n=>{
+      if(visited.has(n))return;if(active.has(n))throw new Error(`Frame graph cycle: ${n.name}`);active.add(n);
+      for(const r of n.reads){const p=producers.get(r);if(p)visit(p);else if(!this.imports.has(r))throw new Error(`Missing producer: ${r}`);}
+      for(const name of n.after){if(!byName.has(name))throw new Error(`Unknown pass: ${name}`);visit(byName.get(name));}
+      active.delete(n);visited.add(n);order.push(n);
+    };
+    this.nodes.forEach(visit);this.order=Object.freeze(order);return this;
+  }
+  execute(encoder,frame){if(!this.order)throw new Error('Compile the frame graph first.');for(const n of this.order)n.run(encoder,frame);}
+  get passes(){return (this.order||this.nodes).map(n=>({name:n.name,reads:n.reads,writes:n.writes}));}
+}
+
+// -------- rendering/gpu-timer.js --------
+/** Optional timestamp-query telemetry, asynchronously read through a 3-slot ring.
+ * No timing result is awaited by playback. Timestamp values may be quantized. */
+class GpuTimer {
+  constructor(device,onSample){
+    this.device=device;this.onSample=onSample;this.enabled=device.features.has('timestamp-query');
+    this.slots=[];this.disposed=false;this.samples=0;this.lastMs=0;
+    if(this.enabled)for(let i=0;i<3;i++)this.slots.push({busy:false,
+      query:device.createQuerySet({type:'timestamp',count:2}),
+      resolve:device.createBuffer({size:256,usage:GPUBufferUsage.QUERY_RESOLVE|GPUBufferUsage.COPY_SRC}),
+      read:device.createBuffer({size:16,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ})});
+  }
+  begin(frame){if(!this.enabled||this.disposed||frame%8!==0)return null;const s=this.slots.find(s=>!s.busy);if(s)s.busy=true;return s||null;}
+  writes(slot,end=false){if(!slot)return undefined;return end?{querySet:slot.query,endOfPassWriteIndex:1}:{querySet:slot.query,beginningOfPassWriteIndex:0};}
+  resolve(encoder,slot){if(!slot)return;encoder.resolveQuerySet(slot.query,0,2,slot.resolve,0);encoder.copyBufferToBuffer(slot.resolve,0,slot.read,0,16);}
+  collect(slot){
+    if(!slot)return;
+    slot.read.mapAsync(GPUMapMode.READ).then(()=>{
+      try{if(this.disposed)return;const t=new BigUint64Array(slot.read.getMappedRange());const ms=Number(t[1]-t[0])/1e6;
+        if(ms>0&&ms<1000){this.lastMs=ms;this.samples++;this.onSample(ms);}
+      }finally{slot.read.unmap();}
+    }).catch(()=>{}).finally(()=>{slot.busy=false;});
+  }
+  dispose(){this.disposed=true;for(const s of this.slots){s.query.destroy();s.resolve.destroy();s.read.destroy();}this.slots=[];}
+}
+
+// -------- rendering/cinematic-pipeline.js --------
+
+/** Cached full-screen triangle pass; no per-frame bind groups or attachment arrays. */
+class FullscreenPass {
+  constructor({label,pipeline,group,view,loadOp='clear'}){
+    Object.assign(this,{pipeline,group});
+    this.descriptor={label,colorAttachments:[{view,loadOp,storeOp:'store',clearValue:{r:0,g:0,b:0,a:0}}]};
+  }
+  run(encoder,{view,timestampWrites}={}){
+    if(view)this.descriptor.colorAttachments[0].view=view;
+    this.descriptor.timestampWrites=timestampWrites;
+    const pass=encoder.beginRenderPass(this.descriptor);pass.setPipeline(this.pipeline);pass.setBindGroup(0,this.group);pass.draw(3);pass.end();
+  }
+}
+/** Compiled graph and leased HDR resources. Setup cost is paid only on extent/look changes. */
+class CinematicPipeline {
+  constructor(renderer){
+    this.r=renderer;this.device=renderer.device;this.pool=new RenderTargetPool(this.device);
+    this.targets=[];this.buffers=[];this.rebuilds=0;this.pipelineCount=0;
+    this.parameters=new Float32Array(20);this.graph=null;this.key=null;
+  }
+  async init(postModule,fogModule){
+    const d=this.device;
+    const entries=[{binding:0,visibility:GPUShaderStage.FRAGMENT,texture:{}},{binding:1,visibility:GPUShaderStage.FRAGMENT,sampler:{}},{binding:2,visibility:GPUShaderStage.FRAGMENT,buffer:{type:'uniform'}}];
+    this.singleLayout=d.createBindGroupLayout({entries});
+    this.upLayout=d.createBindGroupLayout({entries:[...entries,{binding:3,visibility:GPUShaderStage.FRAGMENT,texture:{}}]});
+    this.finishLayout=d.createBindGroupLayout({entries:[...entries,...[3,4,5].map(binding=>({binding,visibility:GPUShaderStage.FRAGMENT,texture:{}}))]});
+    this.fogLayout=d.createBindGroupLayout({entries:[{binding:0,visibility:GPUShaderStage.FRAGMENT,texture:{}},{binding:1,visibility:GPUShaderStage.FRAGMENT,sampler:{}}]});
+    const create=(entry,layout,format)=>d.createRenderPipelineAsync({label:entry,
+      layout:d.createPipelineLayout({bindGroupLayouts:[layout]}),vertex:{module:postModule,entryPoint:'cineVertex'},
+      fragment:{module:postModule,entryPoint:entry,targets:[{format}]},primitive:{topology:'triangle-list'}});
+    [this.down,this.up,this.streak,this.finish,this.fog]=await Promise.all([
+      create('bloomDown',this.singleLayout,'rgba16float'),create('bloomUp',this.upLayout,'rgba16float'),
+      create('anamorphic',this.singleLayout,'rgba16float'),create('cineFinish',this.finishLayout,this.r.format),
+      d.createRenderPipelineAsync({label:'Depth-bounded half-resolution volumetric lighting',
+        layout:d.createPipelineLayout({bindGroupLayouts:[this.r.commonLayout,this.fogLayout]}),
+        vertex:{module:fogModule,entryPoint:'fullscreen'},fragment:{module:fogModule,entryPoint:'fogFragment',targets:[{format:'rgba16float'}]},primitive:{topology:'triangle-list'}})
+    ]);
+    this.pipelineCount=5;
+    this.uniform=d.createBuffer({label:'Cinematic frame settings',size:80,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST});
+    this.black=d.createTexture({label:'Disabled effect fallback',size:[1,1],format:'rgba16float',usage:GPUTextureUsage.TEXTURE_BINDING|GPUTextureUsage.COPY_DST});
+    d.queue.writeTexture({texture:this.black},new Uint16Array(4),{bytesPerRow:8},[1,1]);this.blackView=this.black.createView();
+  }
+  target(width,height,label){
+    const t=this.pool.acquire({width,height,label,usage:GPUTextureUsage.RENDER_ATTACHMENT|GPUTextureUsage.TEXTURE_BINDING});this.targets.push(t);return t;
+  }
+  group(layout,input,buffer,others=[]){
+    return this.device.createBindGroup({layout,entries:[{binding:0,resource:input.view},{binding:1,resource:this.r.sampler},{binding:2,resource:{buffer}},...others.map((view,i)=>({binding:i+3,resource:view}))]});
+  }
+  constant(threshold=0){const b=this.device.createBuffer({size:80,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST});const v=new Float32Array(20);v[4]=threshold;this.device.queue.writeBuffer(b,0,v);this.buffers.push(b);return b;}
+  resize(width,height,sceneWidth,sceneHeight,quality,look){
+    const key=`${width}/${height}/${sceneWidth}/${sceneHeight}/${quality.bloomLevels}/${look.streak>0}/${look.fog>0}`;
+    if(this.key===key)return;this.key=key;this.rebuilds++;
+    for(const t of this.targets)this.pool.release(t);for(const b of this.buffers)b.destroy();this.targets=[];this.buffers=[];
+    const r=this.r,d=this.device,g=new FrameGraph();
+    this.hdr=this.target(sceneWidth,sceneHeight,'Linear HDR / ray distance');
+    const scenePass=new FullscreenPass({label:'Analytic product and starfield',pipeline:r.scenePipeline,group:r.commonGroup,view:this.hdr.view});
+    g.add('scene',{writes:['sceneHDR'],run:(e,f)=>scenePass.run(e,{timestampWrites:r.timer.writes(f.timing)})});
+    g.add('particle-compute',{writes:['particleData'],after:['scene'],run:(e,f)=>{
+      if(f.film.world<.5)return;const p=e.beginComputePass({label:'Time-addressable energy and dust'});p.setPipeline(r.computePipeline);p.setBindGroup(0,r.commonGroup);p.setBindGroup(1,r.computeGroup);p.dispatchWorkgroups(Math.ceil(r.activeParticles/128));p.end();
+    }});
+    const particleDesc={label:'HDR orbital trails and atmospheric motes',colorAttachments:[{view:this.hdr.view,loadOp:'load',storeOp:'store'}]};
+    g.add('particles',{reads:['sceneHDR','particleData'],writes:['litHDR'],run:(e,f)=>{
+      if(f.film.world<.5)return;const p=e.beginRenderPass(particleDesc);p.setPipeline(r.particlePipeline);p.setBindGroup(0,r.commonGroup);p.setBindGroup(1,r.particleGroup);p.draw(6,r.activeParticles);p.end();
+    }});
+    const pyramid=[];let prev=this.hdr,previousName='litHDR';const noThreshold=this.constant(0),threshold=this.constant(1);
+    for(let i=0;i<quality.bloomLevels;i++){
+      const t=this.target(Math.max(2,sceneWidth>>(i+1)),Math.max(2,sceneHeight>>(i+1)),`Bloom down ${i}`);pyramid.push(t);
+      const pass=new FullscreenPass({label:`Fused bloom down ${i}`,pipeline:this.down,group:this.group(this.singleLayout,prev,i===0?threshold:noThreshold),view:t.view});
+      const name=`bloom-down-${i}`;g.add(name,{reads:[previousName],writes:[name],run:e=>pass.run(e)});prev=t;previousName=name;
+    }
+    for(let i=pyramid.length-2;i>=0;i--){
+      const t=this.target(pyramid[i].width,pyramid[i].height,`Bloom up ${i}`);
+      const pass=new FullscreenPass({label:`Tent bloom up ${i}`,pipeline:this.up,group:this.group(this.upLayout,prev,noThreshold,[pyramid[i].view]),view:t.view});
+      const name=`bloom-up-${i}`;g.add(name,{reads:[previousName,`bloom-down-${i}`],writes:[name],run:e=>pass.run(e)});prev=t;previousName=name;
+    }
+    this.bloom=prev;let streakView=this.blackView,fogView=this.blackView;const finalReads=['litHDR',previousName];
+    if(look.streak>0){
+      const input=pyramid[Math.min(2,pyramid.length-1)];const t=this.target(input.width,input.height,'1/8 resolution anamorphic glare');streakView=t.view;
+      const pass=new FullscreenPass({label:'Anamorphic streaks',pipeline:this.streak,group:this.group(this.singleLayout,input,noThreshold),view:t.view});
+      g.add('anamorphic',{reads:[`bloom-down-${Math.min(2,pyramid.length-1)}`],writes:['glare'],run:e=>pass.run(e)});finalReads.push('glare');
+    }
+    if(look.fog>0){
+      const t=this.target(Math.max(2,Math.floor(sceneWidth*quality.fogScale)),Math.max(2,Math.floor(sceneHeight*quality.fogScale)),'Half-resolution depth-aware fog');fogView=t.view;
+      const group=d.createBindGroup({layout:this.fogLayout,entries:[{binding:0,resource:this.hdr.view},{binding:1,resource:r.sampler}]});
+      const desc={label:'Volumetric shafts and haze',colorAttachments:[{view:t.view,loadOp:'clear',storeOp:'store',clearValue:{r:0,g:0,b:0,a:0}}]};
+      g.add('volumetrics',{reads:['litHDR'],writes:['fog'],run:e=>{const p=e.beginRenderPass(desc);p.setPipeline(this.fog);p.setBindGroup(0,r.commonGroup);p.setBindGroup(1,group);p.draw(3);p.end();}});finalReads.push('fog');
+    }
+    const finalPass=new FullscreenPass({label:'Reconstruction / shockwave / glare / grade',pipeline:this.finish,
+      group:this.group(this.finishLayout,this.hdr,this.uniform,[this.bloom.view,streakView,fogView]),view:this.hdr.view});
+    g.add('composite',{reads:finalReads,writes:['present'],run:(e,f)=>finalPass.run(e,{view:f.outputView,timestampWrites:r.timer.writes(f.timing,true)})});
+    this.graph=g.compile();
+  }
+  update(film,look,cameraBasis){
+    const r=this.r,p=this.parameters;const [cx,cy,cz]=film.camera;const y=.47+film.explode*1.44;
+    const dx=-cx,dy=y-cy,dz=-cz;const {right,up,forward}=cameraBasis;
+    const depth=dx*forward[0]+dy*forward[1]+dz*forward[2];const tan=Math.tan(film.fov*Math.PI/360);
+    const sx=.5+(dx*right[0]+dy*right[1]+dz*right[2])/Math.max(.1,depth*tan*r.width/r.height)*.5;
+    const sy=.5-(dx*up[0]+dy*up[1]+dz*up[2])/Math.max(.1,depth*tan)*.5;
+    // Time-addressable hero pulses, never event-accumulated: seeking is reproducible.
+    const pulseAge=film.time>=73?film.time-73:film.time-39.5;
+    const pulse=pulseAge>0&&pulseAge<3?Math.sin(Math.PI*pulseAge/3)*Math.exp(-pulseAge*.8)*look.intensity:0;
+    p.set([r.width,r.height,r.sceneWidth,r.sceneHeight],0);
+    p.set([look.bloom,look.streak,film.world<.5?0:look.fog,r.sceneWidth<r.width?.32:0],4);
+    p.set([film.time,film.fade,look.exposure,look.intensity],8);
+    p.set([Math.max(-2,Math.min(3,sx)),Math.max(-2,Math.min(3,sy)),depth>0?pulse:0,Math.max(0,pulseAge)*.28],12);
+    p.set([0,0,0,0],16);this.device.queue.writeBuffer(this.uniform,0,p);
+  }
+  encode(encoder,frame){this.graph.execute(encoder,frame);}
+  get diagnostics(){return {passes:this.graph?.passes||[],rebuilds:this.rebuilds,pipelines:this.pipelineCount,targets:this.pool.stats};}
+  dispose(){this.pool.dispose();for(const b of this.buffers)b.destroy();this.uniform?.destroy();this.black?.destroy();}
+}
 
 // -------- director.js --------
 /** Pure, deterministic film direction. All times are seconds, all dimensions are metres. */
@@ -151,29 +403,28 @@ function cameraBasis(position,target) {
 
 // -------- renderer.js --------
 
-const QUALITIES = {
-  preview: {pixels:580_000,steps:20,particles:4096},
-  balanced: {pixels:1_300_000,steps:32,particles:12288},
-  cinema: {pixels:2_100_000,steps:46,particles:24576},
-  ultra: {pixels:8_300_000,steps:52,particles:32768}
-};
+const QUALITIES=CINEMA_QUALITIES;
 const HDR='rgba16float';
 const load=async name=>INLINE_SHADERS[name];
 
 /** Native WebGPU: analytic 3D ray tracing → compute particles → 4-level HDR bloom → film grade. */
 class FilmRenderer extends EventTarget {
-  constructor(canvas,{quality='balanced'}={}) {
+  constructor(canvas,{quality='balanced',look='cinematic',adaptive=true}={}) {
     super();this.canvas=canvas;this.quality=quality in QUALITIES?quality:'balanced';
     this.values=new Float32Array(32);this.postValues=new Float32Array(8);
-    this.resources=[];this.ready=false;this.frames=0;this.gpuMs=0;this.errors=[];
+    this.ready=false;this.frames=0;this.gpuMs=0;this.errors=[];
+    this.look=look in CINEMA_LOOKS?look:'cinematic';this.adaptiveEnabled=adaptive;
+    this.adaptive=new AdaptiveQuality();this.inFlight=0;this.maxInFlight=2;this.skippedFrames=0;
+    this.cpuMs=0;this.completionMs=0;this.disposed=false;this.captureLocked=false;
+    this.frameContext={film:null,outputView:null,timing:null};
   }
   async init() {
     if(!navigator.gpu)throw new Error('WebGPU is not available. Open this page on HTTPS or localhost in a WebGPU-capable browser.');
     const adapter=await navigator.gpu.requestAdapter({powerPreference:'high-performance'});
     if(!adapter)throw new Error('No WebGPU adapter was returned. Check hardware acceleration in the browser settings.');
-    this.adapterInfo={...adapter.info};
-    this.device=await adapter.requestDevice();this.device.label='Aether Odyssey GPU';
-    this.device.lost.then(info=>{this.ready=false;this.dispatchEvent(new CustomEvent('lost',{detail:info.message||'GPU device lost.'}));});
+    this.adapter=adapter;this.adapterInfo={vendor:adapter.info.vendor,architecture:adapter.info.architecture,device:adapter.info.device,description:adapter.info.description};
+    this.device=await adapter.requestDevice({requiredFeatures:adapter.features.has('timestamp-query')?['timestamp-query']:[]});this.device.label='Aether Odyssey GPU';
+    this.device.lost.then(info=>{if(this.disposed)return;this.ready=false;this.dispatchEvent(new CustomEvent('lost',{detail:info.message||'GPU device lost.'}));});
     this.device.addEventListener('uncapturederror',e=>{this.errors.push(e.error.message);console.error(e.error.message);this.dispatchEvent(new CustomEvent('error',{detail:e.error.message}));});
     this.context=this.canvas.getContext('webgpu');
     if(!this.context)throw new Error('Cannot create a WebGPU canvas context.');
@@ -182,18 +433,19 @@ class FilmRenderer extends EventTarget {
       usage:GPUTextureUsage.RENDER_ATTACHMENT|GPUTextureUsage.COPY_SRC});
     this.requiresReadback=true;
     const d=this.device;
-    const [common,scene,particles,post]=await Promise.all(['common','scene','particles','post'].map(load));
+    const [common,scene,particles,post,fog]=await Promise.all(['common','scene','particles','cinematic-post','volumetric'].map(load));
     const particleRead=particles.slice(0,particles.indexOf('@compute')).replace('read_write','read')+particles.slice(particles.indexOf('struct ParticleVertex'));
     const modules=await Promise.all([
       this.module(common+scene,'3D ray tracing / glass / metal / atmosphere'),
       this.module(common+particles.slice(0,particles.indexOf('struct ParticleVertex')),'Deterministic orbital particle compute'),
       this.module(common+particleRead,'HDR particle rasterization'),
-      this.module(post,'Bloom and film grade')
+      this.module(post,'Cinematic bloom, anamorphic glare and film grade'),
+      this.module(common+fog,'Depth-aware half-resolution volumetrics')
     ]);
     this.uniform=d.createBuffer({label:'Film camera uniforms',size:128,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST});
     this.sampler=d.createSampler({magFilter:'linear',minFilter:'linear',addressModeU:'clamp-to-edge',addressModeV:'clamp-to-edge'});
     this.engraving=await this.makeEngraving();
-    const commonLayout=d.createBindGroupLayout({entries:[
+    const commonLayout=this.commonLayout=d.createBindGroupLayout({entries:[
       {binding:0,visibility:GPUShaderStage.VERTEX|GPUShaderStage.FRAGMENT|GPUShaderStage.COMPUTE,buffer:{type:'uniform'}},
       {binding:1,visibility:GPUShaderStage.FRAGMENT,texture:{}},
       {binding:2,visibility:GPUShaderStage.FRAGMENT,sampler:{}}
@@ -210,14 +462,8 @@ class FilmRenderer extends EventTarget {
     this.scenePipeline=await d.createRenderPipelineAsync({label:'Analytic world',layout:d.createPipelineLayout({bindGroupLayouts:[commonLayout]}),vertex:{module:modules[0],entryPoint:'fullscreen'},fragment:{module:modules[0],entryPoint:'sceneFragment',targets},primitive:{topology:'triangle-list'}});
     this.computePipeline=await d.createComputePipelineAsync({label:'Orbit integration at absolute film time',layout:d.createPipelineLayout({bindGroupLayouts:[commonLayout,writable]}),compute:{module:modules[1],entryPoint:'simulate'}});
     this.particlePipeline=await d.createRenderPipelineAsync({label:'Additive particle billboards',layout:d.createPipelineLayout({bindGroupLayouts:[commonLayout,readable]}),vertex:{module:modules[2],entryPoint:'particleVertex'},fragment:{module:modules[2],entryPoint:'particleFragment',targets:[{format:HDR,blend:{color:{srcFactor:'one',dstFactor:'one',operation:'add'},alpha:{srcFactor:'zero',dstFactor:'one',operation:'add'}}}]},primitive:{topology:'triangle-list'}});
-    const entries=[{binding:0,visibility:GPUShaderStage.FRAGMENT,texture:{}},{binding:1,visibility:GPUShaderStage.FRAGMENT,sampler:{}},{binding:2,visibility:GPUShaderStage.FRAGMENT,buffer:{type:'uniform'}}];
-    this.postLayout=d.createBindGroupLayout({entries});
-    this.finalLayout=d.createBindGroupLayout({entries:[...entries,...[3,4,5,6].map(binding=>({binding,visibility:GPUShaderStage.FRAGMENT,texture:{}}))]});
-    const postDesc=(entry,layout,format)=>({layout:d.createPipelineLayout({bindGroupLayouts:[layout]}),vertex:{module:modules[3],entryPoint:'vs'},fragment:{module:modules[3],entryPoint:entry,targets:[{format}]},primitive:{topology:'triangle-list'}});
-    [this.downPipeline,this.blurPipeline,this.finalPipeline]=await Promise.all([
-      d.createRenderPipelineAsync(postDesc('down',this.postLayout,HDR)),d.createRenderPipelineAsync(postDesc('blur',this.postLayout,HDR)),d.createRenderPipelineAsync(postDesc('finish',this.finalLayout,this.format))
-    ]);
-    this.finalUniform=d.createBuffer({size:32,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST});
+    this.timer=new GpuTimer(d,ms=>{this.gpuMs=this.gpuMs?this.gpuMs*.8+ms*.2:ms;});
+    this.cinematic=new CinematicPipeline(this);await this.cinematic.init(modules[3],modules[4]);
     this.ready=true;this.resize();return this;
   }
   async module(code,label) {
@@ -236,97 +482,90 @@ class FilmRenderer extends EventTarget {
     const texture=this.device.createTexture({label:'Engraved wordmark',size:[1024,128],format:'rgba8unorm',usage:GPUTextureUsage.TEXTURE_BINDING|GPUTextureUsage.COPY_DST|GPUTextureUsage.RENDER_ATTACHMENT});
     this.device.queue.copyExternalImageToTexture({source:c},{texture},[1024,128]);return texture;
   }
-  setQuality(quality) {if(!(quality in QUALITIES))throw new Error(`Unknown quality: ${quality}`);this.quality=quality;this.resize(true);}
-  texture(w,h,label) {
-    const t=this.device.createTexture({label,size:[w,h],format:HDR,usage:GPUTextureUsage.RENDER_ATTACHMENT|GPUTextureUsage.TEXTURE_BINDING});this.resources.push(t);return t;
+  setQuality(quality){
+    if(!(quality in QUALITIES))throw new Error(`Unknown quality: ${quality}`);
+    this.quality=quality;this.adaptive.reset();this.resize(true);
   }
-  makePostGroup(texture,values) {
-    const buffer=this.device.createBuffer({size:32,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST});
-    this.device.queue.writeBuffer(buffer,0,new Float32Array(values));this.resources.push(buffer);
-    return this.device.createBindGroup({layout:this.postLayout,entries:[{binding:0,resource:texture.createView()},{binding:1,resource:this.sampler},{binding:2,resource:{buffer}}]});
-  }
-  resize(force=false,width=0,height=0) {
+  setLook(look){if(!(look in CINEMA_LOOKS))throw new Error(`Unknown cinematic look: ${look}`);this.look=look;this.resize(true);}
+  setAdaptiveEnabled(value){this.adaptiveEnabled=!!value;this.adaptive.reset();}
+  get canSubmit(){return this.inFlight<this.maxInFlight;}
+  resize(force=false,width=0,height=0){
     if(!this.ready)return;
-    const rect=this.canvas.getBoundingClientRect();const dpr=Math.min(devicePixelRatio||1,2);
-    let w=Math.round(width||rect.width*dpr),h=Math.round(height||rect.height*dpr);
-    if(w<2||h<2)return;
-    const max=this.device.limits.maxTextureDimension2D;
-    let scale=Math.min(1,Math.sqrt(QUALITIES[this.quality].pixels/(w*h)),max/w,max/h);
-    if(width&&height)scale=Math.min(1,max/w,max/h);
-    w=Math.max(2,Math.round(w*scale/2)*2);h=Math.max(2,Math.round(h*scale/2)*2);
-    if(!force&&this.width===w&&this.height===h)return;
-    for(const resource of this.resources)resource.destroy();this.resources=[];
-    this.width=this.canvas.width=w;this.height=this.canvas.height=h;
-    this.hdr=this.texture(w,h,'Full HDR scene');this.hdrView=this.hdr.createView();
-    this.bloom=[];let prev=this.hdr;this.passes=[];
-    for(let i=0;i<4;i++) {
-      const bw=Math.max(2,w>>(i+1)),bh=Math.max(2,h>>(i+1));
-      const a=this.texture(bw,bh,`Bloom ${i} / vertical`),b=this.texture(bw,bh,`Bloom ${i} / horizontal`);
-      this.passes.push({pipeline:this.downPipeline,group:this.makePostGroup(prev,[bw,bh,0,0,i===0?1:0,0,0,0]),view:a.createView()});
-      this.passes.push({pipeline:this.blurPipeline,group:this.makePostGroup(a,[bw,bh,1,0,0,0,0,0]),view:b.createView()});
-      this.passes.push({pipeline:this.blurPipeline,group:this.makePostGroup(b,[bw,bh,0,1,0,0,0,0]),view:a.createView()});
-      this.bloom.push(a);prev=a;
-    }
-    this.finalGroup=this.device.createBindGroup({layout:this.finalLayout,entries:[
-      {binding:0,resource:this.hdrView},{binding:1,resource:this.sampler},{binding:2,resource:{buffer:this.finalUniform}},
-      ...this.bloom.map((t,i)=>({binding:i+3,resource:t.createView()}))
-    ]});
+    const rect=this.canvas.getBoundingClientRect(),dpr=Math.min(globalThis.devicePixelRatio||1,2);
+    const ow=width||rect.width*dpr,oh=height||rect.height*dpr;if(ow<2||oh<2)return;
+    const q=QUALITIES[this.quality],limit=this.device.limits.maxTextureDimension2D;
+    const scale=width&&height?1:Math.min(1,Math.sqrt(q.pixels/(ow*oh)));
+    const [w,h]=evenSize(ow,oh,scale,limit);
+    if(w!==this.width||h!==this.height){this.width=this.canvas.width=w;this.height=this.canvas.height=h;this.releaseCapture();}
+    this.resizeScene(1);
   }
-  drawPass(encoder,pipeline,group,view,label='Post process') {
-    const pass=encoder.beginRenderPass({label,colorAttachments:[{view,loadOp:'clear',storeOp:'store',clearValue:{r:0,g:0,b:0,a:1}}]});
-    pass.setPipeline(pipeline);pass.setBindGroup(0,group);pass.draw(3);pass.end();
+  resizeScene(scale){
+    const q=QUALITIES[this.quality];const [w,h]=evenSize(this.width,this.height,q.sceneScale*scale);
+    this.sceneWidth=w;this.sceneHeight=h;
+    this.cinematic.resize(this.width,this.height,w,h,q,CINEMA_LOOKS[this.look]);
   }
-  async render(film,{audioEnergy=0,wait=false,capture=false}={}) {
-    if(!this.ready)return;
-    const start=performance.now();const {forward,right,up}=cameraBasis(film.camera,film.target);const q=QUALITIES[this.quality];
-    this.values.set([this.width,this.height,film.time,this.width/this.height],0);
-    this.values.set([...film.camera,Math.tan(film.fov*Math.PI/360)],4);
-    this.values.set([...right,film.world],8);this.values.set([...up,film.energy*(1+Math.min(.12,audioEnergy*.12))],12);
-    this.values.set([...forward,film.explode],16);
-    this.values.set([film.sun,film.fade,q.steps,audioEnergy],20);
-    this.values.set([0,.47+film.explode*1.44,0,1.15],24);
-    this.values.set([1,0,0,0],28);
-    this.device.queue.writeBuffer(this.uniform,0,this.values);
-    this.postValues.set([this.width,this.height,0,0,0,film.fade,film.time,0]);
-    this.device.queue.writeBuffer(this.finalUniform,0,this.postValues);
-    const enc=this.device.createCommandEncoder({label:`Film ${film.time.toFixed(3)}`});
-    if(film.world>.5){const cp=enc.beginComputePass({label:'Time-addressable particle field'});cp.setPipeline(this.computePipeline);cp.setBindGroup(0,this.commonGroup);cp.setBindGroup(1,this.computeGroup);cp.dispatchWorkgroups(Math.ceil(q.particles/128));cp.end();}
-    this.drawPass(enc,this.scenePipeline,this.commonGroup,this.hdrView,'Ray-trace analytic world');
-    if(film.world>.5) {
-      const pass=enc.beginRenderPass({label:'Luminous orbital particles',colorAttachments:[{view:this.hdrView,loadOp:'load',storeOp:'store'}]});
-      pass.setPipeline(this.particlePipeline);pass.setBindGroup(0,this.commonGroup);pass.setBindGroup(1,this.particleGroup);pass.draw(6,q.particles);pass.end();
-    }
-    for(const p of this.passes)this.drawPass(enc,p.pipeline,p.group,p.view);
-    // Copy the SAME swapchain texture in the SAME submission, before presentation.
-    // Awaiting onSubmittedWorkDone and then drawImage(canvas) can read a recycled
-    // WebGPU drawing buffer. COPY_SRC + mapped readback has an explicit lifetime.
-    const output=this.context.getCurrentTexture();
-    this.drawPass(enc,this.finalPipeline,this.finalGroup,output.createView(),'Tone mapping / fine grain');
+  async render(film,{audioEnergy=0,wait=false,capture=false,adaptive=false}={}){
+    if(!this.ready)return null;
+    if(!wait&&!capture&&!this.canSubmit){this.skippedFrames++;return null;}
+    const begin=performance.now();const q=QUALITIES[this.quality],look=CINEMA_LOOKS[this.look];
+    const scalable=adaptive&&this.adaptiveEnabled&&!capture&&!this.captureLocked;
+    const scale=scalable?this.adaptive.scale:1;
+    this.resizeScene(scale);
+    const basis=cameraBasis(film.camera,film.target),{forward,right,up}=basis;
+    // Fixed arrays are reused. Internal rendering and native presentation are independent.
+    const v=this.values;v[0]=this.sceneWidth;v[1]=this.sceneHeight;v[2]=film.time;v[3]=this.width/this.height;
+    v.set(film.camera,4);v[7]=Math.tan(film.fov*Math.PI/360);
+    v.set(right,8);v[11]=film.world;v.set(up,12);v[15]=film.energy*(1+Math.min(.12,audioEnergy*.12));
+    v.set(forward,16);v[19]=film.explode;
+    v[20]=film.sun;v[21]=film.fade;v[22]=Math.max(12,Math.round(q.steps*(.72+.28*scale)));v[23]=audioEnergy;
+    v[24]=0;v[25]=.47+film.explode*1.44;v[26]=0;v[27]=1.15;
+    this.activeParticles=Math.max(128,Math.floor(q.particles*(.5+.5*scale)/128)*128);
+    v[28]=scale;v[29]=look.intensity;v[30]=Math.max(6,Math.round(q.fogSteps*scale));v[31]=this.activeParticles;
+    this.device.queue.writeBuffer(this.uniform,0,v);this.cinematic.update(film,look,basis);
+    const enc=this.device.createCommandEncoder({label:'Cinematic film frame'});
+    const output=this.context.getCurrentTexture();const f=this.frameContext;
+    f.film=film;f.outputView=output.createView();f.timing=this.timer.begin(this.frames);
+    this.cinematic.encode(enc,f);
     let readback=null;
     if(capture){
       const layout=readbackLayout(this.width,this.height);
       if(!this.captureBuffer||this.captureBuffer.size!==layout.size){
-        this.releaseCapture();
-        this.captureBuffer=this.device.createBuffer({label:'Recording RGBA readback',size:layout.size,
-          usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ});
+        this.releaseCapture();this.captureBuffer=this.device.createBuffer({label:'Recording RGBA readback',size:layout.size,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ});
       }
       readback=this.captureBuffer;
       enc.copyTextureToBuffer({texture:output},{buffer:readback,bytesPerRow:layout.bytesPerRow},[this.width,this.height]);
     }
-    this.device.queue.submit([enc.finish()]);this.frames++;
-    let image=null;
+    const timing=f.timing;this.timer.resolve(enc,timing);
+    this.device.queue.submit([enc.finish()]);this.frames++;this.inFlight++;
+    const submissionEnd=performance.now();this.cpuMs=this.cpuMs*.9+(submissionEnd-begin)*.1;
+    this.timer.collect(timing);
+    // A fence releases backpressure asynchronously; playback does NOT await it.
+    const completed=this.device.queue.onSubmittedWorkDone();
+    completed.then(()=>{
+      const ms=performance.now()-submissionEnd;this.completionMs=this.completionMs*.9+ms*.1;
+      if(!this.timer.enabled)this.gpuMs=this.completionMs;
+      if(!this.disposed)this.adaptive.observe(this.timer.samples?this.gpuMs:ms,performance.now(),{locked:!scalable||this.captureLocked});
+    }).catch(()=>{}).finally(()=>{this.inFlight=Math.max(0,this.inFlight-1);});
     if(readback){
       await readback.mapAsync(GPUMapMode.READ);
-      try{
-        const data=unpackCapturePixels(new Uint8Array(readback.getMappedRange()),this.width,this.height,this.format);
-        image=new ImageData(data,this.width,this.height);
-      }finally{readback.unmap();}
-    }else if(wait){await this.device.queue.onSubmittedWorkDone();}
-    if(wait||capture)this.gpuMs=this.gpuMs*.9+(performance.now()-start)*.1;
-    return image;
+      try{return new ImageData(unpackCapturePixels(new Uint8Array(readback.getMappedRange()),this.width,this.height,this.format),this.width,this.height);}
+      finally{readback.unmap();}
+    }
+    if(wait)await completed;
+    return null;
   }
+  get diagnostics(){return {
+    engine:'Cinematic WebGPU 3',output:[this.width,this.height],internal:[this.sceneWidth,this.sceneHeight],
+    quality:this.quality,look:this.look,adaptiveEnabled:this.adaptiveEnabled,adaptiveScale:this.adaptive.scale,
+    inFlight:this.inFlight,maxInFlight:this.maxInFlight,skippedFrames:this.skippedFrames,
+    cpuSubmissionMs:this.cpuMs,completionLatencyMs:this.completionMs,
+    gpuTimestampMs:this.timer?.enabled?this.gpuMs:null,timestampSamples:this.timer?.samples||0,
+    particles:this.activeParticles,...this.cinematic?.diagnostics};}
   releaseCapture(){this.captureBuffer?.destroy();this.captureBuffer=null;}
-  dispose(){this.releaseCapture();this.ready=false;for(const r of this.resources)r.destroy();this.uniform?.destroy();this.finalUniform?.destroy();this.particleBuffer?.destroy();this.engraving?.destroy();this.context?.unconfigure();this.device?.destroy();}
+  dispose(){
+    if(this.disposed)return;this.disposed=true;this.ready=false;this.releaseCapture();this.timer?.dispose();this.cinematic?.dispose();
+    this.uniform?.destroy();this.particleBuffer?.destroy();this.engraving?.destroy();this.context?.unconfigure();this.device?.destroy();
+  }
 }
 
 /** Texture-to-buffer rows must be 256-byte aligned; dimensions need not be. */
@@ -703,7 +942,7 @@ const $=s=>document.querySelector(s);
 const stage=$('#stage'),world=$('#world'),params=new URLSearchParams(location.search);
 const initialQuality=params.get('quality')||'balanced';
 const RendererType=navigator.gpu&&!params.has('compat')?FilmRenderer:CompatibilityRenderer;
-const renderer=new RendererType(world,{quality:initialQuality});
+const renderer=new RendererType(world,{quality:initialQuality,look:params.get('look')||'cinematic',adaptive:!params.has('fixed')});
 const soundtrack=new Soundtrack();
 const recorder=new LocalFilmRecorder(renderer,soundtrack);
 let running=false,started=false,ended=false,manualTime=0,busy=false,pendingFrame=null,lastTitle=null,hideTimer,recording=false;
@@ -745,7 +984,7 @@ async function paint(time,{force=false,poster=false}={}){
  try {
   const rect=world.getBoundingClientRect();const f=sampleFilm(time,rect.width/rect.height);
   const capture=recording&&recorder.needsFrame(time);
-  const image=await renderer.render(f,{audioEnergy:soundtrack.energyAt(time),wait:true,capture});
+  const image=await renderer.render(f,{audioEnergy:soundtrack.energyAt(time),wait:force||recording||!running,capture,adaptive:running&&!force&&!recording&&!recordPreparing});
   titleFrame(f);
   const slug=`${String(SHOTS.indexOf(f.shot)+1).padStart(2,'0')} / ${f.shot.name.toUpperCase()}`;
   $('#chapterSlug').textContent=started?slug:'';
@@ -829,7 +1068,7 @@ async function enableSound(){
 }
 async function tick(){
  try {
-  if(running&&!busy){
+  if(running&&!busy&&renderer.canSubmit!==false){
    const t=timeNow();await paint(t);
    if(recording&&t>=recordLimit)await stopRecording();
    if(t>=DURATION){
@@ -838,12 +1077,28 @@ async function tick(){
    }
   }
  }catch(e){fatal(e);}
+ if($('#perfStats')?.checked&&performance.now()-lastPerfUpdate>500){lastPerfUpdate=performance.now();updatePerformanceHUD();}
  requestAnimationFrame(tick);
 }
 async function fullscreen(){try{if(document.fullscreenElement)await document.exitFullscreen();else await stage.requestFullscreen();}catch(e){$('#loadStatus').textContent=e.message;}}
 function updateDiagnostics(){
- $('#diagnostics').textContent=JSON.stringify({renderer:renderer.backend||'Native WebGPU / WGSL',resolution:`${renderer.width} × ${renderer.height}`,quality:renderer.quality,completedFrames:renderer.frames,submissionAndCompletionMs:Math.round(renderer.gpuMs*10)/10,shaderErrors:renderer.errors,adapter:renderer.adapterInfo,music:soundtrack.buffer?`${soundtrack.buffer.duration.toFixed(2)} s / ${soundtrack.buffer.sampleRate} Hz`:'Not yet loaded',audio:soundtrack.diagnostics,recording:recording},null,2);
+ $('#diagnostics').textContent=JSON.stringify({renderer:renderer.backend||'Native WebGPU / WGSL',resolution:`${renderer.width} × ${renderer.height}`,quality:renderer.quality,completedFrames:renderer.frames,submissionAndCompletionMs:Math.round(renderer.gpuMs*10)/10,shaderErrors:renderer.errors,adapter:renderer.adapterInfo,music:soundtrack.buffer?`${soundtrack.buffer.duration.toFixed(2)} s / ${soundtrack.buffer.sampleRate} Hz`:'Not yet loaded',audio:soundtrack.diagnostics,recording:recording,cinematic:renderer.diagnostics||null},null,2);
 }
+let lastPerfUpdate=0;
+function updatePerformanceHUD(){
+ const d=renderer.diagnostics;
+ $('#performanceHUD').hidden=!$('#perfStats').checked;
+ $('#performanceHUD').textContent=d?`${d.output.join(' × ')} output · ${d.internal.join(' × ')} scene\n${d.gpuTimestampMs===null?'Completion '+d.completionLatencyMs.toFixed(1):'GPU '+d.gpuTimestampMs.toFixed(1)} ms · CPU ${d.cpuSubmissionMs.toFixed(2)} ms\n${d.passes.length} passes · ${d.particles} particles · adaptive ${Math.round(d.adaptiveScale*100)}%`:'WebGL2 compatibility renderer';
+}
+$('#look').value=renderer.look||'clean';$('#adaptive').checked=renderer.adaptiveEnabled||false;
+$('#look').disabled=!renderer.setLook;$('#adaptive').disabled=!renderer.setAdaptiveEnabled;
+$('#look').addEventListener('change',async()=>{
+ if(recording||recordPreparing)return;
+ await paintComplete;await renderer.device.queue.onSubmittedWorkDone();renderer.setLook?.($('#look').value);
+ await paint(started?(ended?84.7:timeNow()):82,{force:true,poster:!started});updateDiagnostics();
+});
+$('#adaptive').addEventListener('change',()=>{renderer.setAdaptiveEnabled?.($('#adaptive').checked);updateDiagnostics();});
+$('#perfStats').addEventListener('change',updatePerformanceHUD);
 $('#start').addEventListener('click',()=>start());$('#playPause').addEventListener('click',toggle);
 $('#restart').addEventListener('click',()=>start({silent:soundtrack.silent}));
 $('#sound').addEventListener('click',enableSound);
@@ -865,6 +1120,7 @@ $('#retryAudio').addEventListener('click',()=>{soundtrack.setMuted(false);start(
 $('#silent').addEventListener('click',()=>start({silent:true,from:ended?0:timeNow()}));
 $('#audioFile').addEventListener('change',async e=>{const file=e.target.files?.[0];if(!file)return;try{await soundtrack.importFile(file);await start({skipLoad:true});}catch(error){audioError(error);}});
 function updateRecordingUI(time=timeNow()){
+ $('#look').disabled=!renderer.setLook||recording||recordPreparing;$('#adaptive').disabled=!renderer.setAdaptiveEnabled||recording||recordPreparing;
  const locked=recording||recordPreparing||!!finishingRecording;
  document.body.classList.toggle('recording',locked);
  for(const id of ['recordFilm','scrub','restart','quality','chaptersButton','audioFile'])$('#'+id).disabled=locked;
@@ -888,7 +1144,7 @@ async function startRecording({from=0,to=DURATION}={}){
  if(recording||recordPreparing||finishingRecording)return;
  if(!Number.isFinite(from)||!Number.isFinite(to)||from<0||from>=to||to>DURATION)throw new RangeError('Invalid recording range.');
  const activation=soundtrack.unlock(); // Must remain in the original trusted tap.
- recordPreparing=true;recorder.lastError=null;updateRecordingUI();++startRequest;pause();
+ renderer.captureLocked=true;recordPreparing=true;recorder.lastError=null;updateRecordingUI();++startRequest;pause();
  try{
   await activation;await soundtrack.load();
   if(!renderer.ready||document.hidden)throw new Error('Keep the film tab visible while preparing the recording.');
@@ -899,7 +1155,7 @@ async function startRecording({from=0,to=DURATION}={}){
   const done=recorder.start();recording=true;
   done.catch(error=>{
    if(finishingRecording)return;
-   recording=false;pause();updateRecordingUI();
+   recording=false;renderer.captureLocked=false;pause();updateRecordingUI();
    $('#loadStatus').textContent=error.message;
   });
   await paint(from,{force:true}); // Prime video before awaiting encoder readiness.
@@ -912,7 +1168,7 @@ async function startRecording({from=0,to=DURATION}={}){
   document.body.classList.add('playing');$('#credits').close();revealControls();updateSoundControl();
  }catch(error){
   recorder.fail(error);recording=false;pause();
- }finally{recordPreparing=false;updateRecordingUI();}
+ }finally{recordPreparing=false;if(!recording)renderer.captureLocked=false;updateRecordingUI();}
 }
 async function seekForRecording(time){
  pendingFrame=null;await paintComplete;
@@ -929,7 +1185,7 @@ async function stopRecording(){
    // Best effort automatic download plus a persistent, user-gesture download.
    try{recorder.download();}catch{}return blob;
   }catch(error){$('#loadStatus').textContent=error.message;return null;}
-  finally{renderer.releaseCapture?.();finishingRecording=null;updateRecordingUI();revealControls();}
+  finally{renderer.captureLocked=false;renderer.releaseCapture?.();finishingRecording=null;updateRecordingUI();revealControls();}
  })();updateRecordingUI();return finishingRecording;
 }
 $('#recordFilm').addEventListener('click',()=>startRecording());
@@ -957,6 +1213,7 @@ const ready=(async()=>{
  try {
   await renderer.init();await document.fonts.ready;
   $('#backend').textContent=renderer.backend?'WEBGL2 COMPATIBILITY':'NATIVE WEBGPU';
+  $('#cinematicStatus').textContent=renderer.backend?'Compatibility mode retains its lightweight original post stack. Advanced optics require WebGPU.':'HDR optics, half-resolution shafts, energy fields and adaptive scene quality. Output size remains fixed while adaptive quality changes.';
   if(params.has('capture'))document.body.classList.add('capture-mode');
   if(params.has('time')){started=true;$('#gate').hidden=true;manualTime=clamp(Number(params.get('time')),0,DURATION);await paint(manualTime,{force:true});}
   else await paint(82.0,{force:true,poster:true});

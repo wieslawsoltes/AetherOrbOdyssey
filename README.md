@@ -148,3 +148,7 @@ No font files, copyrighted movie frames, commercial soundtrack master, analytics
 All 42 original text files were transferred with SHA-256 verification. The exact textual baseline is retained in `docs/source-baseline.tar.xz`; subsequent publication edits are separate Git commits. Preview PNGs and the contact sheet were recaptured in GitHub Actions rather than transferred as the original image bytes. This repository uses a new import history, not the earlier local history bundle.
 
 See [import provenance](docs/IMPORT-PROVENANCE.md), [current browser results](tests/browser-results.json), and the [Actions runs](https://github.com/wieslawsoltes/AetherOrbOdyssey/actions). The original `QA.md` and `docs/PUBLICATION-QA.md` describe earlier local validation, not the status of the live deployment. Browser regression checks use the labelled WebGL2 compatibility renderer; they do not claim native WebGPU or physical-device performance validation.
+
+## Cinematic rendering upgrade
+
+See [the cinematic renderer implementation](docs/CINEMATIC-RENDERER.md) for graph and memory contracts, optical treatments, adaptive performance, recording compatibility, and reproducible native GPU validation.

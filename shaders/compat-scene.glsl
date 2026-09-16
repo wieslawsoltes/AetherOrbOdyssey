@@ -32,7 +32,7 @@ vec3 stars(vec3 rd){
  // Direction-space stars stay fixed in world space during camera motion.
  for(int j=0;j<3;j++) {
   vec3 scale=vec3(210.0+float(j)*97.0);
-  vec3 p=dir*scale;vec3 id=floor(p);vec3 f=fract(p)-.5;
+  vec3 p=dir*scale+u.camera.xyz*(.018+float(j)*.012);vec3 id=floor(p);vec3 f=fract(p)-.5;
   float h=hash31(id+float(j)*7.13);float d=length(f);
   float star=exp(-d*d*(170.0+float(j)*80.0))*smoothstep(.925,.992,h);
   accumulated+=star*mix(vec3(.64,.78,1.0),vec3(1.0,.82,.66),h)*3.8;
@@ -123,10 +123,10 @@ vec2 machineryHit(vec3 ro,vec3 rd){
  return vec2(-1.0);
 }
 vec3 machineNormal(vec3 p){
- float e=.0015;
- return normalize(vec3(machinery(p+vec3(e,0.0,0.0)).x-machinery(p-vec3(e,0.0,0.0)).x,
- machinery(p+vec3(0.0,e,0.0)).x-machinery(p-vec3(0.0,e,0.0)).x,
- machinery(p+vec3(0.0,0.0,e)).x-machinery(p-vec3(0.0,0.0,e)).x));
+ // Tetrahedral SDF gradient: four evaluations instead of six.
+ vec3 a=vec3(1.0,-1.0,-1.0)*.0015;vec3 b=vec3(-1.0,-1.0,1.0)*.0015;
+ vec3 c=vec3(-1.0,1.0,-1.0)*.0015;vec3 d=vec3(1.0,1.0,1.0)*.0015;
+ return normalize(a*machinery(p+a).x+b*machinery(p+b).x+c*machinery(p+c).x+d*machinery(p+d).x);
 }
 vec3 machineColor(vec3 p,vec3 n,vec3 rd,float material){
  float nv=max(dot(n,-rd),.001);vec3 refl=reflect(rd,n);
@@ -161,23 +161,26 @@ vec3 energyVolume(vec3 ro,vec3 rd,float near,float far,float steps){
  float t=u.resolution.z;vec3 core=u.orb.xyz;
  float start=near+stride*.5;
  for(int j=0;j<64;j++) {
-  if(float(j)>=steps){break;}
+  if(float(j)>=steps||trans<.025){break;}
   vec3 pos=ro+rd*(start+float(j)*stride);vec3 raw=(pos-core)/u.orb.w;
   vec3 q=rotateY(raw,t*.12);float radial=length(q);
   float n=noise3(q*5.2+vec3(0.0,t*.04,0.0));
-  float n2=noise3(q*12.1-vec3(t*.02,0.0,0.0));
+  float n2=n;if(u.extra.x>.65){n2=noise3(q*12.1-vec3(t*.02,0.0,0.0));}
   float haze=pow(max(0.0,n*.7+n2*.3-.38),2.0)*3.0*(1.0-smoothstep(.72,1.0,radial));
   float density=haze*.25;vec3 emitted=mix(vec3(.17,.04,.42),vec3(.045,.13,.35),n)*haze*.28;
   for(int k=0;k<3;k++){
    float f=float(k);vec3 v=rotateZ(rotateX(q,.35+f*1.04+t*.025),f*.77+t*.05);
-   float rr=length(v.xz);float a=atan(v.z,v.x);
-   float path=.49+f*.095+.04*sin(a*3.0+t*.18+f*2.0);
-   float torus=length(vec2(rr-path,v.y*.85+.062*sin(a*2.0-t*.1+f)));
+   float rr=length(v.xz);float sn=v.z/max(rr,.00001);float cs=v.x/max(rr,.00001);
+   float sin2=2.0*sn*cs;float cos2=cs*cs-sn*sn;float sin3=sn*(3.0-4.0*sn*sn);float cos3=cs*(4.0*cs*cs-3.0);
+   float path=.49+f*.095+.04*(sin3*cos(t*.18+f*2.0)+cos3*sin(t*.18+f*2.0));
+   float torus=length(vec2(rr-path,v.y*.85+.062*(sin2*cos(f-t*.1)+cos2*sin(f-t*.1))));
    float variance=.00011+f*.000025;
    float footprint=variance+stride*stride/12.0;
    float filament=exp(-torus*torus/footprint)*sqrt(variance/footprint);
    float shroud=exp(-torus*torus/.0020)*(.6+n2*.4);
-   float current=.34+.66*pow(.5+.5*sin(a*2.0-t*(.8+f*.18)+f),3.0);
+   float current=.34+.66*pow(.5+.5*(sin2*cos(f-t*(.8+f*.18))+cos2*sin(f-t*(.8+f*.18))),3.0);
+   float arc=pow(max(0.0,sin(v.x*43.0+v.z*31.0+t*(1.2+f*.4))),14.0)*shroud;
+   emitted+=vec3(.28,.67,1.0)*arc*.85*u.extra.y;
    emitted+=mix(vec3(.080,.43,1.0),vec3(.40,.20,.90),f*.44)*(filament*5.5+shroud*.28)*current;
    density+=filament*.1+shroud*.055;
   }
@@ -219,31 +222,54 @@ vec4 product(vec3 ro,vec3 rd,bool reflected){
  if(ball.x>0.0){return vec4(glass(ro,rd,ball,reflected),ball.x);}
  return vec4(0.0,0.0,0.0,-1.0);
 }
+vec3 holography(vec3 ro,vec3 rd,float sceneDepth){
+ float strength=u.extra.y*smoothstep(31.0,36.0,u.resolution.z);vec3 light=vec3(0.0);
+ if(strength<=0.0){return light;}
+ for(int i=0;i<2;i++){
+  float k=float(i);vec3 normal=normalize(vec3(.15*k,1.0,.22*k));
+  vec3 center=u.orb.xyz+vec3(0.0,-.90+k*1.0,0.0);float denom=dot(rd,normal);
+  if(abs(denom)>.0001){
+   float distance=dot(center-ro,normal)/denom;
+   if(distance>0.0 && distance<sceneDepth){
+    vec3 p=ro+rd*distance-center;float radius=length(p);float angle=atan(p.z,p.x);
+    float target=1.40+k*.35;float footprint=max(.004,distance*u.camera.w/u.resolution.y*1.4);
+    float ring=exp(-pow((radius-target)/footprint,2.0));
+    float dash=smoothstep(.05,.22,sin(angle*(22.0+k*9.0)+u.resolution.z*(.24-k*.43)));
+    float ticks=pow(max(0.0,cos(angle*64.0)),28.0)*(1.0-smoothstep(.016,.043,abs(radius-target+.05)));
+    float breathing=.65+.35*sin(u.resolution.z*.65+k);
+    light+=mix(vec3(.055,.35,.78),vec3(.40,.23,.08),k*.5)*(ring*dash+ticks*.55)*strength*breathing;
+   }
+  }
+ }
+ return light;
+}
 vec4 sceneFragment(){
  vec3 ro=u.camera.xyz;vec3 rd=direction(vUv);
- if(u.right.w<.5){return vec4(atmosphere(ro,rd),1.0);}
+ if(u.right.w<.5){return vec4(atmosphere(ro,rd),1000.0);}
  if(u.right.w>1.5){
   vec2 h=sphereHit(ro,rd,u.orb.xyz,u.orb.w*1.28);
-  vec3 col=energyVolume(ro,rd,max(h.x,0.0),max(h.y,0.0),u.parameters.z+12.0);
-  col+=stars(rd)*.14;return vec4(col,1.0);
+  vec3 col=energyVolume(ro,rd,max(h.x,0.0),max(h.y,0.0),u.parameters.z+8.0);
+  col+=stars(rd)*.14;return vec4(col,max(h.y,.01));
  }
  vec4 hit=product(ro,rd,false);
- vec3 col=vec3(.0017,.0022,.0034)+stars(rd)*.045;
- if(hit.w>0.0){col=hit.rgb;}
+ vec3 col=vec3(.0017,.0022,.0034)+stars(rd)*.055;float depth=1000.0;
+ if(hit.w>0.0){col=hit.rgb;depth=hit.w;}
  float ground=(-.906-ro.y)/rd.y;
  if(ground>0.0 && (hit.w<0.0||ground<hit.w)){
+  depth=ground;
   vec3 p=ro+rd*ground;vec3 n=vec3(0.0,1.0,0.0);vec3 refl=reflect(rd,n);
   float rr=length(p.xz);float fres=.08+.70*pow(1.0-max(dot(n,-rd),0.0),5.0);
   vec4 reflection=product(p+vec3(0.0,.005,0.0),refl,true);
-  float floorNoise=noise3(p*7.0)*.50+noise3(p*27.0)*.3+noise3(p*93.0)*.20;
+  float floorNoise=noise3(p*7.0)*.65+noise3(p*27.0)*.35;
   col=vec3(.004,.005,.008)+studio(refl)*.018*(.8+floorNoise*.2);
   if(reflection.w>0.0){col+=reflection.rgb*fres*.67;}
   float halo=exp(-rr*rr*1.35)*(.55+.45*floorNoise);
   col+=vec3(.024,.055,.14)*halo*u.up.w;
-  float contact=1.0-.9*exp(-rr*rr*1.7);
-  col*=contact+.10;
+  float contact=1.0-.9*exp(-rr*rr*1.7);col*=contact+.10;
   col=mix(vec3(.0017,.0022,.0034)+stars(rd)*.045,col,smoothstep(.0,.17,abs(rd.y)));
  }
- return vec4(col,1.0);
+ col+=holography(ro,rd,depth);
+ // Alpha is the distance along this ray, consumed by the volumetric pass.
+ return vec4(col,min(depth,1000.0));
 }
 void main(){fragColor=sceneFragment();}

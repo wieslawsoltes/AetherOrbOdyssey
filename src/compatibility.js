@@ -19,7 +19,7 @@ void main(){float f=float(gl_InstanceID),r1=h(f*.871+3.12),r2=h(f*2.131+9.4),r3=
 const GL_PARTICLE_FRAGMENT=`#version 300 es
 precision highp float;in vec2 particleUV;in vec4 particleColor;out vec4 fragColor;void main(){float r=dot(particleUV,particleUV);float g=exp(-r*4.)*(1.-smoothstep(.55,1.,r));fragColor=vec4(particleColor.rgb*particleColor.a*g*.85,0);}`;
 const GL_QUALITY={preview:{pixels:580000,steps:20,particles:4096},balanced:{pixels:1300000,steps:32,particles:12288},cinema:{pixels:2100000,steps:46,particles:24576},ultra:{pixels:8300000,steps:52,particles:32768}};
-const loadCompat=async()=>{const r=await fetch(new URL('../shaders/compat-scene.glsl',import.meta.url));if(!r.ok)throw new Error('Cannot load compatibility shader.');return r.text();};
+const loadCompat=async()=>{const r=await fetch(new URL('../shaders/compat-scene.glsl?v=cinema-1',import.meta.url));if(!r.ok)throw new Error('Cannot load compatibility shader.');return r.text();};
 export class CompatibilityRenderer extends EventTarget {
  constructor(canvas,{quality='balanced'}={}){super();this.canvas=canvas;this.quality=quality in GL_QUALITY?quality:'balanced';this.errors=[];this.frames=0;this.gpuMs=0;this.resources=[];this.backend='WebGL2 compatibility';}
  async init(){

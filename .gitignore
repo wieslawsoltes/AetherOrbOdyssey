@@ -9,3 +9,5 @@ _site/
 .env
 .env.*
 !.env.example
+
+assets/zarathustra.mp3

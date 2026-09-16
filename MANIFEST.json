@@ -7,13 +7,17 @@
     "bytes": 145,
     "sha256": "3f32bd295d1462a4844d206458a300cb8b6584e99ebc98daf3f17ac65d51835a"
   },
+  ".github/workflows/cinema-validation.yml": {
+    "bytes": 7186,
+    "sha256": "2cfc7c35317bf1977af5abb9c8bb26b199d5ef22c6a0e5771cc8df3f1b5fa903"
+  },
   ".github/workflows/import-source.yml": {
     "bytes": 8793,
     "sha256": "b762ce4bf69c488ffda590f33d3553e29cbb03a16fbe530165e1f10b3a8a52be"
   },
   ".github/workflows/pages.yml": {
-    "bytes": 8054,
-    "sha256": "e89ac112f7b515ef84bcb661a778736ad0734c98e99a07825711cbcaaf3b2334"
+    "bytes": 8387,
+    "sha256": "c090873ae9ef82e3cebf93633789321e89d32689e7e1e083f6782017c1b82416"
   },
   ".github/workflows/repair-iphone-audio.yml": {
     "bytes": 4430,
@@ -24,16 +28,16 @@
     "sha256": "3c808689399818844adef575dc1a42a3e57117a1f688deeda75465637c9941d1"
   },
   ".gitignore": {
-    "bytes": 110,
-    "sha256": "49a097ae206fd5178cf73e51778ba3e271936b938464c35cec18e170a7b5cfcb"
+    "bytes": 134,
+    "sha256": "3a3c3af34686ff8556fdd71ce6732017b7aea47d3c926067baaa250a2c31259f"
   },
   ".nojekyll": {
     "bytes": 0,
     "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
   },
   "Aether-Orb-Odyssey.html": {
-    "bytes": 118425,
-    "sha256": "7bf01283265777ef3030755bfa4ae7731506cb376b354b17ca6fe10d4ce54e4e"
+    "bytes": 149276,
+    "sha256": "3e4833dc3ee08839156af35d1d2fa29ccd8bf73f80b0cbc3585a22d521959d9e"
   },
   "NOTICE.md": {
     "bytes": 3500,
@@ -44,8 +48,8 @@
     "sha256": "d6562f6c71c215a040a5bc59e2e598e9df4e564a129a95ca7594b91001121963"
   },
   "README.md": {
-    "bytes": 10577,
-    "sha256": "88f3f6119fc12c5ce5a9a9fe3d502cb8a2e3c0127dac11ab2af10decbb6db79a"
+    "bytes": 10821,
+    "sha256": "92b4a69bc7eca2760552f797cb172037a985a66900e91ae86a1542cad2861a02"
   },
   "assets/README.md": {
     "bytes": 305,
@@ -58,6 +62,10 @@
   "docs/CHROME-RECORDING.md": {
     "bytes": 6520,
     "sha256": "376a5342714ded2c912a66a3e43868df4b20d4c59c62f15fe6f9f5c994776103"
+  },
+  "docs/CINEMATIC-RENDERER.md": {
+    "bytes": 6821,
+    "sha256": "cbee307727b5add2fa26b7e870dfc27c95dd974259fab53150f17072b6d1dbd3"
   },
   "docs/IMPORT-PROVENANCE.md": {
     "bytes": 1101,
@@ -112,8 +120,8 @@
     "sha256": "7c25e8156b0ed5a4d5095cb8609be183431d410b3b09ff16f3a200f157291c22"
   },
   "index.html": {
-    "bytes": 7592,
-    "sha256": "de6beefcdd999e142990a7540daf5cef4c7ff8eb1c3564fbb7e84f90ecf8dd5e"
+    "bytes": 8198,
+    "sha256": "c9effce9d16bc994d2ad3bb11c0eb99dc9a55d04b1687325b6b985ebda1dcc10"
   },
   "package.json": {
     "bytes": 555,
@@ -163,37 +171,45 @@
     "bytes": 312884,
     "sha256": "e3db474d471543997db35a652e2251443fe89ccd20b9ecb4e50fbfecfce7e4a6"
   },
+  "shaders/cinematic-post.wgsl": {
+    "bytes": 5121,
+    "sha256": "3e03f98976150b2ee59e53ca8dd9cc9980e24f0e7877d25ed60297e9ebf8c956"
+  },
   "shaders/common.wgsl": {
     "bytes": 1984,
     "sha256": "254a97f575267aa1bb0fb1840cd52bc888559f53ff836dc61689364146bf8f28"
   },
   "shaders/compat-scene.glsl": {
-    "bytes": 11966,
-    "sha256": "df5658593253c21f4bb91e14a7b01c56b9a712e79937f867efa847f7b71f1227"
+    "bytes": 13646,
+    "sha256": "8cd4eeecf5e520a8f4d71777b76a47c1bb4afaa1eb3b329d21ed2a4fc07d7b12"
   },
   "shaders/particles.wgsl": {
-    "bytes": 1838,
-    "sha256": "1161e548b47bb1bb3157c601fbd2b4e27e015b62a218fbdb69d4de7792428ab5"
+    "bytes": 2201,
+    "sha256": "5f72fbf186f669356d441955bc3613ac4021c61224b45d723e88be2dfbb22d3b"
   },
   "shaders/post.wgsl": {
     "bytes": 2597,
     "sha256": "885edc17ce3b7ee9ab3d68070bba605e6ca79fdedfbe122d2673ccc5d64e5da3"
   },
   "shaders/scene.wgsl": {
-    "bytes": 10323,
-    "sha256": "2be75b7e81a2894387f020783f770e882fdd19679d62c843aedd4353e646cdaf"
+    "bytes": 11963,
+    "sha256": "91e2a734957858c98a687f763cde4126513bde1cd465f805c0326190582e7542"
+  },
+  "shaders/volumetric.wgsl": {
+    "bytes": 1540,
+    "sha256": "ae443deb7238033da01eb628f40f5add1a72b1fd0cd8e3aa800f8aa44de51437"
   },
   "src/app.js": {
-    "bytes": 19361,
-    "sha256": "539e881a55dec90ab588fcc9e224bfd0bb8a6399c844a61bd07889d20b8df636"
+    "bytes": 21487,
+    "sha256": "62b0d65630db9157995c0923306f05f8defcae259508b8e310c294ee98e4f36b"
   },
   "src/audio.js": {
     "bytes": 8295,
     "sha256": "f40710484a451298e6a56d850bd74d36c7a4738383effd9f18be14ac4ab9ff33"
   },
   "src/compatibility.js": {
-    "bytes": 11519,
-    "sha256": "14a954e6cd59e150c6709a5724959afd0bfbb31d814923c054639478c1c2cac3"
+    "bytes": 11530,
+    "sha256": "3ead1f8e8d937491cbb082a663e05a66c6d932d73af0bc283d01b4bd57f74561"
   },
   "src/director.js": {
     "bytes": 4510,
@@ -204,20 +220,40 @@
     "sha256": "9500ee6a3a002032f8d77afa5840aa33cdc79ea07ca0c19e54847d0a86559757"
   },
   "src/renderer.js": {
-    "bytes": 14923,
-    "sha256": "546bf0aeb046b9f832423cc3b8c3b52251ff0b064770972e1d1d384120ceba83"
+    "bytes": 13873,
+    "sha256": "d974ef98ab22d7331d3646d16f22b4eae97615d1f6cbe72a7b841800dff2b437"
+  },
+  "src/rendering/cinematic-pipeline.js": {
+    "bytes": 9811,
+    "sha256": "03517c22cd7ea75a85720bb2aa45ebcc90db15846a8a7317897fbb3ae2dbb9d5"
+  },
+  "src/rendering/frame-graph.js": {
+    "bytes": 1711,
+    "sha256": "1fa45246915b5d044dddfe9d31233f929c3a0f49b0d6091f510b53fe64609a78"
+  },
+  "src/rendering/gpu-timer.js": {
+    "bytes": 1695,
+    "sha256": "9699655b8a3bd3675e80a5a4ed7971d3e40cb93290555ed7342eae8759851fbb"
+  },
+  "src/rendering/quality.js": {
+    "bytes": 2526,
+    "sha256": "0c93812219c0ac801c19ab16df6bedea3bceca2e63d71c0291d781d56739c6b3"
+  },
+  "src/rendering/target-pool.js": {
+    "bytes": 2093,
+    "sha256": "bea5ece7ee71bb325423326d9560255f89d1f9eae603b266454112384ee90291"
   },
   "style.css": {
-    "bytes": 13222,
-    "sha256": "e6468443cb2ba72cef2846684926207029205916698c86dbaaa9a37680f83970"
+    "bytes": 14149,
+    "sha256": "df1836f4f28ff2984c3da28d5dd3d2ebe0e6275b6e1f22f57526c4e6dadd184a"
   },
   "tests/audio.test.mjs": {
     "bytes": 7203,
     "sha256": "10c9597719dfb50b29b94283fd7e8d7d0ce90c80d3a6c402e7319e5bb4a137a0"
   },
   "tests/audio_browser.py": {
-    "bytes": 9818,
-    "sha256": "09f7eed30a34130b9244e4885dcc17df6ce20d6fbd8a7b488769e83169d5b6d2"
+    "bytes": 9819,
+    "sha256": "2a418722db16eacb73a74cc817a3cd7277f197eafb4ddb1db8b8185673fd2d2a"
   },
   "tests/browser-results.json": {
     "bytes": 776,
@@ -226,6 +262,14 @@
   "tests/browser_smoke.py": {
     "bytes": 6646,
     "sha256": "171539e5b616c8f6671f059fa2597f9f222188048b3c3c5295187d808f53b5a5"
+  },
+  "tests/cinema_browser.py": {
+    "bytes": 8509,
+    "sha256": "8a8ea177468c32c746a3c45484b7418193aa3aef7dd087fcbafe520c9a11158a"
+  },
+  "tests/cinematic.test.mjs": {
+    "bytes": 4273,
+    "sha256": "5e555a3524678efe7aa15eae7026935d44eca43c48b4a5b4ef380a6bf3445f21"
   },
   "tests/director.test.mjs": {
     "bytes": 1396,
@@ -256,8 +300,8 @@
     "sha256": "e8139221bafae76e23e5600bfba9e9e3deba251243cc93ee1aa0efdd36636ffc"
   },
   "tools/build_single.py": {
-    "bytes": 1676,
-    "sha256": "66e4b177f68616faed5d0b2b2ef98996fbf4041f2049619f6bd193c15b80ef7d"
+    "bytes": 1812,
+    "sha256": "6cef7490df5b446da74b0ded08a151a06bd1a41bd73ad64366c4d96514641234"
   },
   "tools/capture.py": {
     "bytes": 4868,
@@ -272,8 +316,8 @@
     "sha256": "842440090d299c5134d9c23fe81db47d489ce2dd92f476802b66e2c1ed163d1c"
   },
   "tools/manifest.py": {
-    "bytes": 2062,
-    "sha256": "169dfb063c865cc89aede11a318a40f137cbcfcea0335dfd0d16a90b92c59685"
+    "bytes": 2081,
+    "sha256": "5c968cb1d65c39e80878e5d8ca6e318f27200fecc5a0df7d8aacad42d7591c32"
   },
   "tools/publish-github.sh": {
     "bytes": 209,
