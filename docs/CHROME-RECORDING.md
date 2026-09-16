@@ -73,3 +73,30 @@ track and the preparation phase times out. The real macOS Chrome regression test
 reproduced this condition on a second capture with one video frame and zero bytes.
 Both tracks are now primed before waiting for readiness, while startup remains
 bounded and failures pause playback and release recording resources.
+
+## Executed macOS recording validation
+
+GitHub Actions run 35133451644, macOS job 104920305061, passed all
+recording browser checks with Google Chrome 152.0.7977.65 on macOS
+14.8.9 ARM64 and the actual NATIVE WEBGPU renderer. Tests recorded real
+film scenes and the credited MP3, then decoded VP8 video and Opus audio.
+Checks covered the Record film UI, pause/resume, Stop & save, a byte-identical
+manual re-download, a second glass-scene recording with changing nonblack
+pixels and nonzero encoded music, natural end finalization, and visible
+recovery from an injected asynchronous encoder error. These were 960x540
+capture tests on a hosted Mac, not a full-duration 1080p performance test
+or a test on the user's own Mac. The source gate also passed 35 JavaScript
+and 13 Python tests, plus real-audio Chromium and WebKit checks.
+
+Evidence: https://github.com/wieslawsoltes/AetherOrbOdyssey/actions/runs/35133451644/job/104920305061
+
+The separate Linux SwiftShader native-WebGPU job in that run failed
+during renderer initialization, before any recording or audio began:
+"A valid external Instance reference no longer exists." This reproduced
+with both Chromium 143 and installed Google Chrome 152. It remains an
+unresolved Linux native-rendering/driver compatibility limitation; no
+Linux native-WebGPU recording success is claimed. The mandatory release
+matrix now explicitly requires native WebGPU on macOS Chrome and
+independently exercises the WebGL2 compatibility capture path on Linux.
+A backend assertion prevents silently passing native tests with fallback.
+Neither job suppresses test failures. Both must pass before deployment.

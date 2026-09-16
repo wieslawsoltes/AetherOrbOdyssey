@@ -71,6 +71,8 @@ async def run(args):
           await page.wait_for_function('window.__film',timeout=60000)
           assert await page.evaluate('window.__film.ready'),await page.locator('#fatalText').inner_text()
           report['backend']=await page.locator('#backend').inner_text()
+          if args.backend=='webgpu':assert report['backend']=='NATIVE WEBGPU','Native WebGPU is required; compatibility fallback is not a pass'
+          if args.backend=='compat':assert report['backend']=='WEBGL2 COMPATIBILITY','Explicit compatibility capture was not selected'
           report['adapter']=await page.evaluate('window.__film.renderer.adapterInfo')
           assert not await page.evaluate('window.__film.state.running')
           if args.inline:

@@ -12,16 +12,16 @@
     "sha256": "b762ce4bf69c488ffda590f33d3553e29cbb03a16fbe530165e1f10b3a8a52be"
   },
   ".github/workflows/pages.yml": {
-    "bytes": 7704,
-    "sha256": "8c1de810d934a550da40b03164df99bd9d0e47a7979a5a72127b5dc4e74979d7"
+    "bytes": 8054,
+    "sha256": "e89ac112f7b515ef84bcb661a778736ad0734c98e99a07825711cbcaaf3b2334"
   },
   ".github/workflows/repair-iphone-audio.yml": {
     "bytes": 4430,
     "sha256": "e2e1581a9bb133db3cc6b58efd7986b07a65a52e469db5032154f83995f03dd8"
   },
   ".github/workflows/repair-recording.yml": {
-    "bytes": 4949,
-    "sha256": "b06c01c097820ec29b1533a643085360d56212f9418eea2f361628bd65bf7b53"
+    "bytes": 4950,
+    "sha256": "a94626c319b3ceb69cc78718bfc5690785abad1e1b6ed7288f3a9ae6eb41d67d"
   },
   ".gitignore": {
     "bytes": 110,
@@ -56,8 +56,8 @@
     "sha256": "6b49cb9b654cea12e53c23bddf059c3e765ee57bdff2974a433a5ac7591f20b6"
   },
   "docs/CHROME-RECORDING.md": {
-    "bytes": 4559,
-    "sha256": "c6a0f1f926deef9dc5544d6cbb661143cb60c1d1142fa4d76ebd2b05f833a441"
+    "bytes": 6199,
+    "sha256": "50246d8025114d39cf0a846abc6a159a26761836b9a8441ba9d757b4780fefa9"
   },
   "docs/IMPORT-PROVENANCE.md": {
     "bytes": 1101,
@@ -236,8 +236,8 @@
     "sha256": "1708357d6e7d6b8e21447bd1e7b636c6089e6695b4cf52e2d7a2f231cae9b968"
   },
   "tests/recording_browser.py": {
-    "bytes": 11448,
-    "sha256": "6b34de2e17410f9d17e49b8638e73c3c30cfba09e1958b171b02d44df1604649"
+    "bytes": 11727,
+    "sha256": "2c5742513de60eda56989f4fdeeaefa8ea5379d17e4f35b358853028a9c6560d"
   },
   "tests/test_encode_music.py": {
     "bytes": 2435,
