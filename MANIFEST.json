@@ -20,8 +20,8 @@
     "sha256": "e2e1581a9bb133db3cc6b58efd7986b07a65a52e469db5032154f83995f03dd8"
   },
   ".github/workflows/repair-recording.yml": {
-    "bytes": 4950,
-    "sha256": "a94626c319b3ceb69cc78718bfc5690785abad1e1b6ed7288f3a9ae6eb41d67d"
+    "bytes": 4174,
+    "sha256": "3c808689399818844adef575dc1a42a3e57117a1f688deeda75465637c9941d1"
   },
   ".gitignore": {
     "bytes": 110,
@@ -56,8 +56,8 @@
     "sha256": "6b49cb9b654cea12e53c23bddf059c3e765ee57bdff2974a433a5ac7591f20b6"
   },
   "docs/CHROME-RECORDING.md": {
-    "bytes": 6199,
-    "sha256": "50246d8025114d39cf0a846abc6a159a26761836b9a8441ba9d757b4780fefa9"
+    "bytes": 6520,
+    "sha256": "376a5342714ded2c912a66a3e43868df4b20d4c59c62f15fe6f9f5c994776103"
   },
   "docs/IMPORT-PROVENANCE.md": {
     "bytes": 1101,
@@ -236,8 +236,8 @@
     "sha256": "1708357d6e7d6b8e21447bd1e7b636c6089e6695b4cf52e2d7a2f231cae9b968"
   },
   "tests/recording_browser.py": {
-    "bytes": 11727,
-    "sha256": "2c5742513de60eda56989f4fdeeaefa8ea5379d17e4f35b358853028a9c6560d"
+    "bytes": 12259,
+    "sha256": "bde6f32a9be1cc0d46c5d0f607fec9c8e6883193337a1732db1f13864e9d84c9"
   },
   "tests/test_encode_music.py": {
     "bytes": 2435,

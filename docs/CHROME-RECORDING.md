@@ -49,10 +49,14 @@ result with FFmpeg. Assertions include both video/audio tracks, decoded frame co
 nonzero audio samples, changing nonblack image pixels, pause/resume, persistent
 re-download, second recording, natural end, and an explicitly injected encoder error.
 
-GitHub Pages is gated on native WebGPU/Chromium on Linux and installed Google Chrome
-on a macOS runner. Native adapter availability/backend, OS and exact browser version
-are included in each report. A hosted macOS runner is not the user's physical Mac;
-when native WebGPU is unavailable there, its report explicitly identifies WebGL2.
+GitHub Pages is gated on explicitly required native WebGPU in installed Google Chrome
+on macOS and a separate Linux WebGL2 compatibility recording check. Backend, OS,
+render resolution and exact browser version are included in each report. A hosted
+macOS runner is not the user's physical Mac. Falling back to WebGL2 cannot satisfy
+the macOS native-WebGPU gate. CPU-rendered Linux smoke captures use 320x180 while
+retaining the full 960x540 application UI; macOS native captures remain 960x540.
+Both paths still require decoded moving video, encoded music and lifecycle tests.
+These tests are functional checks, not high-resolution performance guarantees.
 Local container browser navigation/GPU policy prevented a GPU test; local unit tests
 are not reported as a native/physical-device pass. Consult the current Actions run
 and its recording evidence artifacts for actual executed results.

@@ -74,6 +74,12 @@ async def run(args):
           if args.backend=='webgpu':assert report['backend']=='NATIVE WEBGPU','Native WebGPU is required; compatibility fallback is not a pass'
           if args.backend=='compat':assert report['backend']=='WEBGL2 COMPATIBILITY','Explicit compatibility capture was not selected'
           report['adapter']=await page.evaluate('window.__film.renderer.adapterInfo')
+          # SwiftShader is CPU rendering: keep the full 960x540 UI, but bound the
+          # real renderer's capture surface so a short scene contains multiple frames.
+          # Do not relax decoded-frame, motion, audio, or lifecycle assertions.
+          if platform.system()=='Linux' and args.backend=='compat':
+            await page.evaluate('window.__film.renderer.resize(true,320,180)')
+          report['renderResolution']=await page.evaluate('({width:window.__film.renderer.width,height:window.__film.renderer.height})')
           assert not await page.evaluate('window.__film.state.running')
           if args.inline:
             encoded=base64.b64encode((root/'assets/zarathustra.mp3').read_bytes()).decode()
