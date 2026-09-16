@@ -130,12 +130,15 @@ function evenSize(width,height,scale=1,limit=16384){
 /** Discrete levels + hysteresis prevent per-frame texture churn and quality pumping. */
 class AdaptiveQuality {
   constructor({targetMs=16.67,minScale=.55,maxScale=1,cooldownMs=1800}={}){
-    if(!(targetMs>0&&minScale>0&&minScale<=maxScale&&maxScale<=1&&cooldownMs>=0))throw new RangeError('Invalid adaptive quality budget.');
+    if(![targetMs,minScale,maxScale,cooldownMs].every(Number.isFinite)||!(targetMs>0&&minScale>0&&minScale<=maxScale&&maxScale<=1&&cooldownMs>=0))throw new RangeError('Invalid adaptive quality budget.');
     Object.assign(this,{targetMs,minScale,maxScale,cooldownMs});this.reset();
   }
   reset(){this.scale=this.maxScale;this.average=0;this.samples=0;this.slow=0;this.fast=0;this.lastChange=-Infinity;}
   observe(ms,now,{locked=false}={}){
-    if(locked||!Number.isFinite(ms)||ms<=0||ms>250||!Number.isFinite(now))return false;
+    if(locked||!Number.isFinite(ms)||ms<=0||!Number.isFinite(now))return false;
+    // A legitimately overloaded GPU must still trigger downscaling. Saturate
+    // extreme samples instead of discarding every frame on a slow device.
+    ms=Math.min(ms,250);
     this.average=this.samples++?this.average*.9+ms*.1:ms;
     if(this.samples<12)return false;
     this.slow=this.average>this.targetMs*1.18?this.slow+1:0;
@@ -186,7 +189,8 @@ class FrameGraph {
     if(this.order)throw new Error('Cannot mutate a compiled frame graph.');
     if(this.nodes.some(n=>n.name===name)||typeof run!=='function')throw new Error(`Invalid/duplicate pass: ${name}`);
     if(reads.some(r=>writes.includes(r)))throw new Error('Use versioned logical resources for read/write passes.');
-    this.nodes.push({name,reads,writes,after,run});return this;
+    // Dependency data is a snapshot, not a mutable alias to caller-owned arrays.
+    this.nodes.push(Object.freeze({name,reads:Object.freeze([...reads]),writes:Object.freeze([...writes]),after:Object.freeze([...after]),run}));return this;
   }
   compile(){
     const producers=new Map(),byName=new Map(this.nodes.map(n=>[n.name,n]));
@@ -407,7 +411,7 @@ const QUALITIES=CINEMA_QUALITIES;
 const HDR='rgba16float';
 const load=async name=>INLINE_SHADERS[name];
 
-/** Native WebGPU: analytic 3D ray tracing → compute particles → 4-level HDR bloom → film grade. */
+/** Native WebGPU: analytic HDR → particles → fused optics/volumetrics → film grade. */
 class FilmRenderer extends EventTarget {
   constructor(canvas,{quality='balanced',look='cinematic',adaptive=true}={}) {
     super();this.canvas=canvas;this.quality=quality in QUALITIES?quality:'balanced';
@@ -500,9 +504,14 @@ class FilmRenderer extends EventTarget {
     this.resizeScene(1);
   }
   resizeScene(scale){
+    // Steady-state frames do not allocate extent arrays or descriptor keys.
+    if(this._sceneOutputWidth===this.width&&this._sceneOutputHeight===this.height&&
+       this._sceneScale===scale&&this._sceneQuality===this.quality&&this._sceneLook===this.look)return;
     const q=QUALITIES[this.quality];const [w,h]=evenSize(this.width,this.height,q.sceneScale*scale);
     this.sceneWidth=w;this.sceneHeight=h;
     this.cinematic.resize(this.width,this.height,w,h,q,CINEMA_LOOKS[this.look]);
+    this._sceneOutputWidth=this.width;this._sceneOutputHeight=this.height;
+    this._sceneScale=scale;this._sceneQuality=this.quality;this._sceneLook=this.look;
   }
   async render(film,{audioEnergy=0,wait=false,capture=false,adaptive=false}={}){
     if(!this.ready)return null;
@@ -559,7 +568,7 @@ class FilmRenderer extends EventTarget {
     quality:this.quality,look:this.look,adaptiveEnabled:this.adaptiveEnabled,adaptiveScale:this.adaptive.scale,
     inFlight:this.inFlight,maxInFlight:this.maxInFlight,skippedFrames:this.skippedFrames,
     cpuSubmissionMs:this.cpuMs,completionLatencyMs:this.completionMs,
-    gpuTimestampMs:this.timer?.enabled?this.gpuMs:null,timestampSamples:this.timer?.samples||0,
+    gpuTimestampMs:this.timer?.samples?this.gpuMs:null,timestampSamples:this.timer?.samples||0,
     particles:this.activeParticles,...this.cinematic?.diagnostics};}
   releaseCapture(){this.captureBuffer?.destroy();this.captureBuffer=null;}
   dispose(){

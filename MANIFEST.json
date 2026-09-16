@@ -36,8 +36,8 @@
     "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
   },
   "Aether-Orb-Odyssey.html": {
-    "bytes": 149300,
-    "sha256": "865fe93007a646ab81d9089d50608310414eb997725cca3f14ac9013242d9cfe"
+    "bytes": 150125,
+    "sha256": "f69d6de35f86c0e2cf5133e6a860445db811b5029c4149b9932b9663822cd5d3"
   },
   "NOTICE.md": {
     "bytes": 3500,
@@ -62,6 +62,10 @@
   "docs/CHROME-RECORDING.md": {
     "bytes": 6520,
     "sha256": "376a5342714ded2c912a66a3e43868df4b20d4c59c62f15fe6f9f5c994776103"
+  },
+  "docs/CINEMATIC-RELEASE.md": {
+    "bytes": 1943,
+    "sha256": "8ac0d672b8ee74d8750400630557673f8aee628298c87bba71b5a8692d55f1c8"
   },
   "docs/CINEMATIC-RENDERER.md": {
     "bytes": 6821,
@@ -124,8 +128,8 @@
     "sha256": "c9effce9d16bc994d2ad3bb11c0eb99dc9a55d04b1687325b6b985ebda1dcc10"
   },
   "package.json": {
-    "bytes": 555,
-    "sha256": "604cd1aa19cd18bc7b1b12f5db5ba66f04cfd6d3d04d35b61efd7b34b0582861"
+    "bytes": 655,
+    "sha256": "5582dec3fcb4e6881af1ba713eb303fd32787e4045866748f1dc29822165d283"
   },
   "previews/00-gate-landscape.png": {
     "bytes": 683210,
@@ -220,24 +224,24 @@
     "sha256": "9500ee6a3a002032f8d77afa5840aa33cdc79ea07ca0c19e54847d0a86559757"
   },
   "src/renderer.js": {
-    "bytes": 13873,
-    "sha256": "d974ef98ab22d7331d3646d16f22b4eae97615d1f6cbe72a7b841800dff2b437"
+    "bytes": 14287,
+    "sha256": "8a9d704e29243a666eeddf36ed948329d20fe3ac8bfd706a8857236773554400"
   },
   "src/rendering/cinematic-pipeline.js": {
     "bytes": 9811,
     "sha256": "03517c22cd7ea75a85720bb2aa45ebcc90db15846a8a7317897fbb3ae2dbb9d5"
   },
   "src/rendering/frame-graph.js": {
-    "bytes": 1711,
-    "sha256": "1fa45246915b5d044dddfe9d31233f929c3a0f49b0d6091f510b53fe64609a78"
+    "bytes": 1887,
+    "sha256": "a3414a01f67bc23a49a2e1bca2cd157b4d7b7806958fc13bc3c92e2bff446a87"
   },
   "src/rendering/gpu-timer.js": {
     "bytes": 1695,
     "sha256": "9699655b8a3bd3675e80a5a4ed7971d3e40cb93290555ed7342eae8759851fbb"
   },
   "src/rendering/quality.js": {
-    "bytes": 2526,
-    "sha256": "0c93812219c0ac801c19ab16df6bedea3bceca2e63d71c0291d781d56739c6b3"
+    "bytes": 2761,
+    "sha256": "c853c099ef357f6d3fb0a3684f3a7bd0bb64afce9d389557800f485b69d5ccc7"
   },
   "src/rendering/target-pool.js": {
     "bytes": 2093,
@@ -264,12 +268,12 @@
     "sha256": "171539e5b616c8f6671f059fa2597f9f222188048b3c3c5295187d808f53b5a5"
   },
   "tests/cinema_browser.py": {
-    "bytes": 8509,
-    "sha256": "8a8ea177468c32c746a3c45484b7418193aa3aef7dd087fcbafe520c9a11158a"
+    "bytes": 10512,
+    "sha256": "b58495a7da7d35c4e173072ff15e06ab9e5ebaec419e35fdcfa279f44a592ed6"
   },
   "tests/cinematic.test.mjs": {
-    "bytes": 4273,
-    "sha256": "5e555a3524678efe7aa15eae7026935d44eca43c48b4a5b4ef380a6bf3445f21"
+    "bytes": 4269,
+    "sha256": "34695f3893ff7bc16c2d24f28ebf362e0f9ea7f877ca48b03d90bac901433b43"
   },
   "tests/director.test.mjs": {
     "bytes": 1396,
@@ -282,6 +286,10 @@
   "tests/recording_browser.py": {
     "bytes": 12259,
     "sha256": "bde6f32a9be1cc0d46c5d0f607fec9c8e6883193337a1732db1f13864e9d84c9"
+  },
+  "tests/rendering-lifecycle.test.mjs": {
+    "bytes": 5704,
+    "sha256": "1062c188e39e7c4728be6d99bdac559f1d4c5cb3eecea555bf83026387afe0cc"
   },
   "tests/test_encode_music.py": {
     "bytes": 2435,
