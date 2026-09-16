@@ -1,0 +1,94 @@
+name: Repair Chrome recording
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/repair-recording.yml'
+      - 'docs/recording-repair/**'
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: repair-chrome-recording
+  cancel-in-progress: false
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out the exact repair revision
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          ref: ${{ github.sha }}
+      - name: Apply hash-verified recording fix
+        shell: python
+        run: |
+          import hashlib, json, lzma, pathlib, subprocess
+          root = pathlib.Path.cwd()
+          paths = [root / 'docs/recording-repair' / f'{n:03}.bin' for n in range(1, 5)]
+          raw = b''.join(p.read_bytes() for p in paths)
+          assert hashlib.sha256(raw).hexdigest() == '4debe03a45390eec412025c34de49e5a03d51049f8582b6d48686877f8b25f88', 'Patch archive integrity failure'
+          patch = json.loads(lzma.decompress(raw))
+          allowed = {'src/app.js', 'src/export.js', 'src/renderer.js', 'index.html', 'style.css', 'tools/build_single.py', 'tests/recording.test.mjs', 'tests/recording_browser.py', 'docs/CHROME-RECORDING.md'}
+          assert set(patch) == allowed, 'Unexpected patch paths'
+          pending = {}
+          for name, delta in patch.items():
+              path = root / name
+              before = path.read_bytes() if path.exists() else b''
+              old_blob = hashlib.sha1(b'blob ' + str(len(before)).encode() + b'\0' + before).hexdigest()
+              target_hash = hashlib.sha256(before).hexdigest()
+              if target_hash == delta['sha256']:
+                  continue
+              if delta['oldBlob'] is None:
+                  assert not path.exists(), f'New file already exists: {name}'
+              else:
+                  assert old_blob == delta['oldBlob'], f'Source changed since review: {name}; refusing overwrite'
+              old = before.decode('utf-8')
+              parts = []
+              for p in delta['parts']:
+                  if isinstance(p, str):
+                      parts.append(p)
+                  else:
+                      assert len(p) == 2 and 0 <= p[0] <= p[1] <= len(old), f'Invalid delta: {name}'
+                      parts.append(old[p[0]:p[1]])
+              data = ''.join(parts).encode('utf-8')
+              assert hashlib.sha256(data).hexdigest() == delta['sha256'], f'Reconstructed source integrity failure: {name}'
+              pending[path] = data
+          for path, data in pending.items():
+              path.parent.mkdir(parents=True, exist_ok=True)
+              path.write_bytes(data)
+          print(f'Applied {len(pending)} verified source files.')
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Ensure audio encoder for existing regression tests
+        run: |
+          if ! command -v ffmpeg >/dev/null || ! command -v ffprobe >/dev/null; then
+            sudo apt-get update && sudo apt-get install -y ffmpeg
+          fi
+      - name: Run source regression tests
+        run: |
+          npm test
+          python3 -m unittest discover -s tests -p 'test_*.py' -v
+          for file in src/*.js; do node --check "$file"; done
+          python3 -m compileall -q tools tests
+      - name: Regenerate standalone edition and complete source inventory
+        run: |
+          python3 tools/build_compat.py
+          python3 tools/build_single.py
+          python3 tools/manifest.py write
+          python3 tools/manifest.py check
+      - name: Commit verified repair without rewriting remote history
+        env:
+          EXPECTED_HEAD: ${{ github.sha }}
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/app.js src/export.js src/renderer.js index.html style.css tools/build_single.py tests/recording.test.mjs tests/recording_browser.py docs/CHROME-RECORDING.md Aether-Orb-Odyssey.html MANIFEST.json
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m 'Fix Chrome recording: WebGPU readback, recorder lifecycle and recoverable downloads'
+          git fetch origin main
+          test "$(git rev-parse origin/main)" = "$EXPECTED_HEAD" || { echo 'main changed; refusing overwrite'; exit 1; }
+          git push origin HEAD:main

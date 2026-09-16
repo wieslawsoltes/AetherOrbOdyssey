@@ -7,31 +7,34 @@ on:
     branches: [main]
   workflow_dispatch:
   workflow_run:
-    workflows: [Apply iPhone audio repair]
+    workflows: [Apply iPhone audio repair, Repair Chrome recording]
     types: [completed]
-
 permissions:
   contents: read
-
 concurrency:
   group: pages-${{ github.ref }}
   cancel-in-progress: false
-
 jobs:
   build:
     if: >-
       (github.event_name != 'workflow_run' ||
        (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main')) &&
-      (github.event_name != 'push' || !contains(github.event.head_commit.message, '[audio-repair]'))
+      (github.event_name != 'push' ||
+       (!contains(github.event.head_commit.message, '[audio-repair]') && !contains(github.event.head_commit.message, '[recording-repair]')))
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
+    outputs:
+      revision: ${{ steps.revision.outputs.sha }}
     steps:
       - name: Check out complete project
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
         with:
           persist-credentials: false
+      - name: Pin the tested revision
+        id: revision
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
       - name: Set up Node.js
-        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
         with:
           node-version: '24'
           package-manager-cache: false
@@ -42,7 +45,7 @@ jobs:
           fi
       - name: Verify source inventory
         run: python3 tools/manifest.py check
-      - name: Test camera timeline and deployment tooling
+      - name: Test camera, recorder and deployment tooling
         run: |
           npm test
           python3 -m unittest discover -s tests -p 'test_*.py' -v
@@ -76,16 +79,89 @@ jobs:
           echo '```json' >> "$GITHUB_STEP_SUMMARY"
           cat "$RUNNER_TEMP/audio-browser-results.json" >> "$GITHUB_STEP_SUMMARY"
           echo '```' >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload exact runtime for recording validation
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: recording-runtime
+          path: _site
+          retention-days: 7
       - name: Upload Pages artifact
         if: github.event_name != 'pull_request'
-        uses: actions/upload-pages-artifact@7b1f4a764d45c48632c6b24a0339c27f5614fb0b # v4
+        uses: actions/upload-pages-artifact@7b1f4a764d45c48632c6b24a0339c27f5614fb0b
         with:
           path: _site
           retention-days: 7
 
+  recording-check:
+    needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            backend: webgpu
+            name: native-webgpu
+          - os: macos-14
+            backend: auto
+            name: macos-chrome
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - name: Check out the exact tested source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          ref: ${{ needs.build.outputs.revision }}
+          persist-credentials: false
+      - name: Download the exact Pages runtime
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: recording-runtime
+          path: _site
+      - name: Set up isolated browser test environment
+        run: |
+          python3 -m venv "$RUNNER_TEMP/capture-venv"
+          "$RUNNER_TEMP/capture-venv/bin/python" -m pip install --disable-pip-version-check playwright==1.57.0
+      - name: Install Linux capture dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg libvulkan1 mesa-vulkan-drivers
+          "$RUNNER_TEMP/capture-venv/bin/python" -m playwright install --with-deps chromium
+      - name: Ensure Google Chrome and FFmpeg on macOS
+        if: runner.os == 'macOS'
+        run: |
+          if ! command -v ffmpeg >/dev/null; then brew install ffmpeg; fi
+          if [ ! -x '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' ]; then
+            "$RUNNER_TEMP/capture-venv/bin/python" -m playwright install chrome
+          fi
+          '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' --version
+      - name: Record and decode actual film scenes
+        env:
+          BACKEND: ${{ matrix.backend }}
+        run: |
+          FLAGS=()
+          if [ "$RUNNER_OS" = macOS ]; then FLAGS+=(--chrome); fi
+          "$RUNNER_TEMP/capture-venv/bin/python" tests/recording_browser.py \
+            --root _site --output "$RUNNER_TEMP/recording-results" --backend "$BACKEND" "${FLAGS[@]}"
+      - name: Preserve recording evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: recording-${{ matrix.name }}
+          path: ${{ runner.temp }}/recording-results
+          if-no-files-found: warn
+          retention-days: 7
+      - name: Recording verification summary
+        if: always()
+        run: |
+          echo '## Actual browser recording checks' >> "$GITHUB_STEP_SUMMARY"
+          echo '```json' >> "$GITHUB_STEP_SUMMARY"
+          cat "$RUNNER_TEMP/recording-results/recording-results.json" >> "$GITHUB_STEP_SUMMARY" || true
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
   deploy:
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
-    needs: build
+    needs: [build, recording-check]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -97,16 +173,17 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: Configure GitHub Pages
-        uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5
+        uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b
       - name: Publish verified artifact
         id: deployment
-        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e
       - name: Check out publication verifier
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
         with:
+          ref: ${{ needs.build.outputs.revision }}
           persist-credentials: false
       - name: Verify public revision and all runtime assets
         env:
           SITE_URL: ${{ steps.deployment.outputs.page_url }}
-          EXPECTED_COMMIT: ${{ github.sha }}
+          EXPECTED_COMMIT: ${{ needs.build.outputs.revision }}
         run: python3 tools/verify_site.py --url "$SITE_URL" --commit "$EXPECTED_COMMIT" --attempts 12
