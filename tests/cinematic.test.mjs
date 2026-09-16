@@ -39,7 +39,7 @@ test('Adaptive quality lowers workload under sustained pressure, with cooldown',
 });
 test('Adaptive quality ignores invalid samples and recovers gradually',()=>{
  const a=new AdaptiveQuality();for(let i=0;i<160;i++)a.observe(35,i*20);const low=a.scale;
- for(const x of [NaN,Infinity,-1,0,500])assert.equal(a.observe(x,9999),false);
+ for(const x of [NaN,Infinity,-1,0])assert.equal(a.observe(x,9999),false);
  for(let i=0;i<600;i++)a.observe(4,5000+i*20);assert.ok(a.scale>low);assert.ok(a.scale<=1);
  a.reset();assert.equal(a.scale,1);assert.equal(a.samples,0);
 });

@@ -1,6 +1,6 @@
 {
   "name": "aether-orb-odyssey",
-  "version": "2.0.0",
+  "version": "3.0.0",
   "private": true,
   "type": "module",
   "description": "A real-time WebGPU product film for CrystalBall / Aether Orb",
@@ -10,7 +10,8 @@
     "test:pages": "python3 -m unittest discover -s tests -p 'test_*.py' -v",
     "build:pages": "python3 tools/build_pages.py",
     "verify:source": "python3 tools/manifest.py check",
-    "publish:pages": "bash tools/publish-github.sh"
+    "publish:pages": "bash tools/publish-github.sh",
+    "test:cinema": "python3 tests/cinema_browser.py --root _site --output capture/cinema --chrome"
   },
   "engines": {
     "node": ">=20"

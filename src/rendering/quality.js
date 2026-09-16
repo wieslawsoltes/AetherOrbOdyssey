@@ -18,12 +18,15 @@ export function evenSize(width,height,scale=1,limit=16384){
 /** Discrete levels + hysteresis prevent per-frame texture churn and quality pumping. */
 export class AdaptiveQuality {
   constructor({targetMs=16.67,minScale=.55,maxScale=1,cooldownMs=1800}={}){
-    if(!(targetMs>0&&minScale>0&&minScale<=maxScale&&maxScale<=1&&cooldownMs>=0))throw new RangeError('Invalid adaptive quality budget.');
+    if(![targetMs,minScale,maxScale,cooldownMs].every(Number.isFinite)||!(targetMs>0&&minScale>0&&minScale<=maxScale&&maxScale<=1&&cooldownMs>=0))throw new RangeError('Invalid adaptive quality budget.');
     Object.assign(this,{targetMs,minScale,maxScale,cooldownMs});this.reset();
   }
   reset(){this.scale=this.maxScale;this.average=0;this.samples=0;this.slow=0;this.fast=0;this.lastChange=-Infinity;}
   observe(ms,now,{locked=false}={}){
-    if(locked||!Number.isFinite(ms)||ms<=0||ms>250||!Number.isFinite(now))return false;
+    if(locked||!Number.isFinite(ms)||ms<=0||!Number.isFinite(now))return false;
+    // A legitimately overloaded GPU must still trigger downscaling. Saturate
+    // extreme samples instead of discarding every frame on a slow device.
+    ms=Math.min(ms,250);
     this.average=this.samples++?this.average*.9+ms*.1:ms;
     if(this.samples<12)return false;
     this.slow=this.average>this.targetMs*1.18?this.slow+1:0;

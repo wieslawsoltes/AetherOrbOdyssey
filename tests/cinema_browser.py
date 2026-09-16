@@ -91,6 +91,24 @@ async def run(args):
           assert await inline.evaluate('__film.ready'),await inline.locator('#fatalText').inner_text()
           await inline.evaluate('__film.frame(74,{clean:true})');await inline.screenshot(path=str(out/'standalone.png'));await inline.close()
           report['checks'].append('Generated standalone edition compiles and renders the same cinematic stack')
+          # All presets run their real shaders at a fixed, affordable test output.
+          report['presets']=await page.evaluate('''async()=>{
+            const {sampleFilm}=await import('./src/director.js');const r=__film.renderer,rows=[];
+            for(const quality of ['preview','balanced','cinema','ultra']){
+              await r.device.queue.onSubmittedWorkDone();r.setQuality(quality);r.resize(true,640,360);
+              const image=await r.render(sampleFilm(40,16/9),{wait:true,capture:true});
+              let lit=0;for(let i=0;i<image.data.length;i+=4)if(image.data[i]+image.data[i+1]+image.data[i+2]>20)lit++;
+              rows.push({quality,output:[image.width,image.height],internal:r.diagnostics.internal,passes:r.diagnostics.passes.length,lit});
+            }
+            r.setQuality('balanced');r.resize(true,640,360);r.adaptive.scale=.55;r.captureLocked=true;
+            await r.render(sampleFilm(40,16/9),{wait:true,adaptive:true,capture:true});
+            const locked=r.diagnostics;r.captureLocked=false;
+            if(locked.internal[0]!==544||locked.internal[1]!==306)throw new Error('Capture changed adaptive extent');
+            return rows;
+          }''')
+          assert all(row['output']==[640,360] and row['lit']>640*360*.02 for row in report['presets'])
+          assert [row['passes'] for row in report['presets']]==[11,13,15,15]
+          report['checks'].append('Every quality preset renders real nonblack pixels; capture lock fixes internal and output extents')
           assert not await page.evaluate('__film.renderer.errors')
           if args.baseline:
             baseline_server,base_origin=serve(args.baseline.resolve());base=await b.new_page(viewport={'width':960,'height':540})
@@ -101,6 +119,13 @@ async def run(args):
             new=statistics.mean(r['medianCompletionMs'] for r in report['upgraded']['rows'])
             report['comparison']={'baselineMeanOfShotMediansMs':old,'upgradedMeanOfShotMediansMs':new,'ratio':new/old,
                 'scope':'Sequential completion-time samples at equal 960x540 output, Balanced presets. New renderer intentionally uses reduced internal resolution and different shader/effect budgets. Not an equal-workload microbenchmark or sustained FPS guarantee.'}
+          report['disposal']=await page.evaluate('''async()=>{
+            const r=__film.renderer;await r.device.queue.onSubmittedWorkDone();r.dispose();r.dispose();
+            return r.diagnostics.targets;
+          }''')
+          assert report['disposal']['live']==0 and report['disposal']['idle']==0
+          assert report['disposal']['created']==report['disposal']['destroyed']
+          report['checks'].append('Renderer disposal releases every pooled HDR target and is idempotent')
           assert not report['errors'],report['errors'];report['status']='passed'
         except BaseException:
           try:report['fatal']=await page.locator('#fatalText').inner_text();await page.screenshot(path=str(out/'failure.png'))

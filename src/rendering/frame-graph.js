@@ -5,7 +5,8 @@ export class FrameGraph {
     if(this.order)throw new Error('Cannot mutate a compiled frame graph.');
     if(this.nodes.some(n=>n.name===name)||typeof run!=='function')throw new Error(`Invalid/duplicate pass: ${name}`);
     if(reads.some(r=>writes.includes(r)))throw new Error('Use versioned logical resources for read/write passes.');
-    this.nodes.push({name,reads,writes,after,run});return this;
+    // Dependency data is a snapshot, not a mutable alias to caller-owned arrays.
+    this.nodes.push(Object.freeze({name,reads:Object.freeze([...reads]),writes:Object.freeze([...writes]),after:Object.freeze([...after]),run}));return this;
   }
   compile(){
     const producers=new Map(),byName=new Map(this.nodes.map(n=>[n.name,n]));

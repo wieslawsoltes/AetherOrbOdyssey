@@ -7,7 +7,7 @@ const QUALITIES=CINEMA_QUALITIES;
 const HDR='rgba16float';
 const load=async name=>{const r=await fetch(new URL(`../shaders/${name}.wgsl?v=cinema-1`,import.meta.url));if(!r.ok)throw new Error(`Shader ${name}: HTTP ${r.status}`);return r.text();};
 
-/** Native WebGPU: analytic 3D ray tracing → compute particles → 4-level HDR bloom → film grade. */
+/** Native WebGPU: analytic HDR → particles → fused optics/volumetrics → film grade. */
 export class FilmRenderer extends EventTarget {
   constructor(canvas,{quality='balanced',look='cinematic',adaptive=true}={}) {
     super();this.canvas=canvas;this.quality=quality in QUALITIES?quality:'balanced';
@@ -100,9 +100,14 @@ export class FilmRenderer extends EventTarget {
     this.resizeScene(1);
   }
   resizeScene(scale){
+    // Steady-state frames do not allocate extent arrays or descriptor keys.
+    if(this._sceneOutputWidth===this.width&&this._sceneOutputHeight===this.height&&
+       this._sceneScale===scale&&this._sceneQuality===this.quality&&this._sceneLook===this.look)return;
     const q=QUALITIES[this.quality];const [w,h]=evenSize(this.width,this.height,q.sceneScale*scale);
     this.sceneWidth=w;this.sceneHeight=h;
     this.cinematic.resize(this.width,this.height,w,h,q,CINEMA_LOOKS[this.look]);
+    this._sceneOutputWidth=this.width;this._sceneOutputHeight=this.height;
+    this._sceneScale=scale;this._sceneQuality=this.quality;this._sceneLook=this.look;
   }
   async render(film,{audioEnergy=0,wait=false,capture=false,adaptive=false}={}){
     if(!this.ready)return null;
@@ -159,7 +164,7 @@ export class FilmRenderer extends EventTarget {
     quality:this.quality,look:this.look,adaptiveEnabled:this.adaptiveEnabled,adaptiveScale:this.adaptive.scale,
     inFlight:this.inFlight,maxInFlight:this.maxInFlight,skippedFrames:this.skippedFrames,
     cpuSubmissionMs:this.cpuMs,completionLatencyMs:this.completionMs,
-    gpuTimestampMs:this.timer?.enabled?this.gpuMs:null,timestampSamples:this.timer?.samples||0,
+    gpuTimestampMs:this.timer?.samples?this.gpuMs:null,timestampSamples:this.timer?.samples||0,
     particles:this.activeParticles,...this.cinematic?.diagnostics};}
   releaseCapture(){this.captureBuffer?.destroy();this.captureBuffer=null;}
   dispose(){
