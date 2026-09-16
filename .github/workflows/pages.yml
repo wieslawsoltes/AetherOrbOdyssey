@@ -139,6 +139,11 @@ jobs:
             "$RUNNER_TEMP/capture-venv/bin/python" -m playwright install chrome
           fi
           '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' --version
+      - name: Validate cinematic GPU effects and resource stability on macOS
+        if: runner.os == 'macOS'
+        run: |
+          "$RUNNER_TEMP/capture-venv/bin/python" tests/cinema_browser.py \
+            --root _site --output "$RUNNER_TEMP/cinema-results" --chrome
       - name: Record and decode actual film scenes
         env:
           BACKEND: ${{ matrix.backend }}
@@ -152,7 +157,9 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: recording-${{ matrix.name }}
-          path: ${{ runner.temp }}/recording-results
+          path: |
+            ${{ runner.temp }}/recording-results
+            ${{ runner.temp }}/cinema-results
           if-no-files-found: warn
           retention-days: 7
       - name: Recording verification summary

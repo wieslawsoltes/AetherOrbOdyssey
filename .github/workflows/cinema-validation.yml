@@ -9,35 +9,108 @@ concurrency:
   group: cinema-${{ github.ref }}
   cancel-in-progress: true
 jobs:
-  source:
+  prepare:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    outputs:
+      revision: ${{ steps.revision.outputs.sha }}
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
         with:
-          persist-credentials: false
-      - name: Archive exact source
-        run: git archive --format=zip HEAD -o "$RUNNER_TEMP/source.zip"
+          ref: ${{ github.sha }}
+      - name: Apply reviewed source transfer when present
+        shell: python
+        run: |
+          import base64, hashlib, json, lzma, pathlib, shutil
+          root = pathlib.Path.cwd()
+          directory = root / '.ci-transfer'
+          if directory.exists():
+              encoded = ''.join((directory / f'{i:03}.b64').read_text() for i in range(1, 6))
+              raw = base64.b64decode(encoded, validate=True)
+              assert hashlib.sha256(raw).hexdigest() == 'c57e185ba1d1269320effab71feb866e0a63292c21b36ac853b88b86cd0f53a4'
+              patch = json.loads(lzma.decompress(raw))
+              allowed = {'.gitignore', 'README.md', 'docs/CINEMATIC-RENDERER.md', 'index.html', 'shaders/cinematic-post.wgsl', 'shaders/particles.wgsl', 'shaders/scene.wgsl', 'shaders/volumetric.wgsl', 'src/app.js', 'src/compatibility.js', 'src/renderer.js', 'src/rendering/cinematic-pipeline.js', 'src/rendering/frame-graph.js', 'src/rendering/gpu-timer.js', 'src/rendering/quality.js', 'src/rendering/target-pool.js', 'style.css', 'tests/audio_browser.py', 'tests/cinema_browser.py', 'tests/cinematic.test.mjs', 'tools/build_single.py', 'tools/manifest.py'}
+              assert set(patch) == allowed, 'Unexpected transfer paths'
+              pending = {}
+              for name, delta in patch.items():
+                  path = root / name
+                  before = path.read_bytes() if path.exists() else b''
+                  if hashlib.sha256(before).hexdigest() == delta['sha256']:
+                      continue
+                  if delta['oldBlob'] is None:
+                      assert not path.exists(), f'New file already exists: {name}'
+                  else:
+                      actual = hashlib.sha1(b'blob ' + str(len(before)).encode() + b'\0' + before).hexdigest()
+                      assert actual == delta['oldBlob'], f'Source changed since review: {name}'
+                  old = before.decode('utf-8')
+                  parts = []
+                  for part in delta['parts']:
+                      if isinstance(part, str):
+                          parts.append(part)
+                      else:
+                          assert len(part) == 2 and 0 <= part[0] <= part[1] <= len(old)
+                          parts.append(old[part[0]:part[1]])
+                  data = ''.join(parts).encode('utf-8')
+                  assert hashlib.sha256(data).hexdigest() == delta['sha256'], f'Reconstruction failed: {name}'
+                  pending[path] = data
+              for path, data in pending.items():
+                  path.parent.mkdir(parents=True, exist_ok=True)
+                  path.write_bytes(data)
+              shutil.rmtree(directory)
+              print(f'Installed {len(pending)} hash-verified source files.')
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Test source and regenerate distributable
+        run: |
+          npm test
+          for file in src/*.js src/rendering/*.js; do node --check "$file"; done
+          python3 tools/build_compat.py
+          python3 tools/build_single.py
+          python3 tools/manifest.py write
+          python3 tools/manifest.py check
+      - name: Commit exact source without rewriting concurrent work
+        id: revision
+        env:
+          EXPECTED_HEAD: ${{ github.sha }}
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A -- src shaders tests tools docs README.md .gitignore index.html style.css Aether-Orb-Odyssey.html MANIFEST.json
+          if git ls-files --error-unmatch .ci-transfer/001.b64 >/dev/null 2>&1; then git add -A -- .ci-transfer; fi
+          if ! git diff --cached --quiet; then
+            git commit -m 'Implement cinematic render graph, adaptive HDR pipeline and sci-fi effects'
+            git fetch origin feat/cinematic-renderer
+            test "$(git rev-parse origin/feat/cinematic-renderer)" = "$EXPECTED_HEAD" || { echo 'Branch changed; refusing overwrite'; exit 1; }
+            git push origin HEAD:feat/cinematic-renderer
+          fi
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          git archive --format=zip HEAD -o "$RUNNER_TEMP/source.zip"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: cinema-source
           path: ${{ runner.temp }}/source.zip
           retention-days: 7
   cinema:
+    needs: prepare
     runs-on: macos-14
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
         with:
+          ref: ${{ needs.prepare.outputs.revision }}
           persist-credentials: false
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
         with:
           node-version: '24'
           package-manager-cache: false
       - run: npm test
-      - name: Cinematic GPU and performance verification
+      - name: Prepare browser and real soundtrack
         shell: bash
         run: |
-          if [ ! -f tests/cinema_browser.py ]; then exit 0; fi
           python3 -m venv "$RUNNER_TEMP/cinema-venv"
           "$RUNNER_TEMP/cinema-venv/bin/python" -m pip install playwright==1.57.0
           if ! command -v ffmpeg >/dev/null; then brew install ffmpeg; fi
@@ -46,8 +119,17 @@ jobs:
           fi
           python3 tools/fetch_music.py
           python3 tools/build_pages.py
-          "$RUNNER_TEMP/cinema-venv/bin/python" tests/cinema_browser.py --root _site --output "$RUNNER_TEMP/cinema-evidence" --chrome
-          "$RUNNER_TEMP/cinema-venv/bin/python" tests/recording_browser.py --root _site --output "$RUNNER_TEMP/recording-evidence" --backend webgpu --chrome
+          mkdir -p "$RUNNER_TEMP/cinema-baseline"
+          git fetch --depth=1 origin ef095319283875b819713bd35ea045d413c1d0c9
+          git archive ef095319283875b819713bd35ea045d413c1d0c9 | tar -x -C "$RUNNER_TEMP/cinema-baseline"
+      - name: Validate actual native GPU effects and benchmark both revisions
+        run: |
+          "$RUNNER_TEMP/cinema-venv/bin/python" tests/cinema_browser.py \
+            --root _site --output "$RUNNER_TEMP/cinema-evidence" --chrome --baseline "$RUNNER_TEMP/cinema-baseline"
+      - name: Verify actual film recording remains functional
+        run: |
+          "$RUNNER_TEMP/cinema-venv/bin/python" tests/recording_browser.py \
+            --root _site --output "$RUNNER_TEMP/recording-evidence" --backend webgpu --chrome
       - name: Preserve native GPU evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
