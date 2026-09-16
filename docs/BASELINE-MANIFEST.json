@@ -1,0 +1,158 @@
+{
+  ".gitignore": {
+    "bytes": 58,
+    "sha256": "ef10ddb9240522e18c3aa50bef702eeba1e5b382347babbb31e51bdb61cb6e18"
+  },
+  "Aether-Orb-Odyssey.html": {
+    "bytes": 97220,
+    "sha256": "48f9cdab5a3020a6944b5ce6c3e356c56630d10dda1f04306d5955e59cdb82a3"
+  },
+  "NOTICE.md": {
+    "bytes": 2972,
+    "sha256": "5e6bc78dcabcebe2e1168ed8453127f02a4543069ac717f874e4984aefc3b37b"
+  },
+  "QA.md": {
+    "bytes": 3658,
+    "sha256": "d6562f6c71c215a040a5bc59e2e598e9df4e564a129a95ca7594b91001121963"
+  },
+  "README.md": {
+    "bytes": 8404,
+    "sha256": "ea5f3ff91d731bd5d3aa4a77250709e9239f018b8b69f25f547a5a3a5032c5f6"
+  },
+  "assets/README.md": {
+    "bytes": 305,
+    "sha256": "630939237d9c5a52ceafed5dd2d838b2df4127dc69e550a70504a5a367439252"
+  },
+  "index.html": {
+    "bytes": 6534,
+    "sha256": "8423ffcde56857564f3c55bcfd71b9afed1750ce3ca48da84a0f181c4997d38c"
+  },
+  "package.json": {
+    "bytes": 265,
+    "sha256": "54cbbc1db617ed359019e54e6b70308cf82c85f55466d410531403c7d2fd910b"
+  },
+  "previews/00-gate-landscape.png": {
+    "bytes": 683433,
+    "sha256": "8b6ad4c5e1f1cdc033f22931471d317be178968137c10509d16c661912bd7b8d"
+  },
+  "previews/01-7-5.png": {
+    "bytes": 612445,
+    "sha256": "5886fbddef762fd79badb408ffad96f6bc663f4d8e73e2013ac282bfebe8a496"
+  },
+  "previews/02-19-5.png": {
+    "bytes": 853487,
+    "sha256": "ee776a78e1c2d3617a7668bd2a7e7e85b48ce762a689f6f8070802b6c5172fe6"
+  },
+  "previews/03-29.png": {
+    "bytes": 761177,
+    "sha256": "ccffbf23c2f190ba02fcdfef6457f342e33d1b0959ef283b0123b73435317efb"
+  },
+  "previews/04-39-5.png": {
+    "bytes": 678582,
+    "sha256": "13d8e4b0afa66e8412875ab5ee09d238c3743d733ac3b7d2809a9c8fce1b6d30"
+  },
+  "previews/05-53.png": {
+    "bytes": 869392,
+    "sha256": "a955a1b4c37752c35b8abcf98624d07b531d60f124c350dc0268fb7b7c197962"
+  },
+  "previews/06-63-5.png": {
+    "bytes": 657959,
+    "sha256": "4747604f9c733f359ac0f6194d6969411d1e09a92062ce683cd6be11648f7090"
+  },
+  "previews/07-73.png": {
+    "bytes": 654140,
+    "sha256": "e3da132e54915d61a27d0621b03cb6786bf0c58400f7d83254578be705266ed8"
+  },
+  "previews/08-82-5.png": {
+    "bytes": 650948,
+    "sha256": "6b12f93b472c3358de2f0357e0006a03a43a645e9da87a37e0cd34cbefb2df70"
+  },
+  "previews/09-portrait.png": {
+    "bytes": 319979,
+    "sha256": "985ac3a5304eee9f141a78f0547b3f36e4530c0e268a552bf558a0e1f1bb3cac"
+  },
+  "previews/contact-sheet.jpg": {
+    "bytes": 368980,
+    "sha256": "a09a211cc9bc9b03f9a16b7e1bb21049f341121d7d51581b58f48ba30a8e2121"
+  },
+  "shaders/common.wgsl": {
+    "bytes": 1984,
+    "sha256": "254a97f575267aa1bb0fb1840cd52bc888559f53ff836dc61689364146bf8f28"
+  },
+  "shaders/compat-scene.glsl": {
+    "bytes": 11966,
+    "sha256": "df5658593253c21f4bb91e14a7b01c56b9a712e79937f867efa847f7b71f1227"
+  },
+  "shaders/particles.wgsl": {
+    "bytes": 1838,
+    "sha256": "1161e548b47bb1bb3157c601fbd2b4e27e015b62a218fbdb69d4de7792428ab5"
+  },
+  "shaders/post.wgsl": {
+    "bytes": 2597,
+    "sha256": "885edc17ce3b7ee9ab3d68070bba605e6ca79fdedfbe122d2673ccc5d64e5da3"
+  },
+  "shaders/scene.wgsl": {
+    "bytes": 10323,
+    "sha256": "2be75b7e81a2894387f020783f770e882fdd19679d62c843aedd4353e646cdaf"
+  },
+  "src/app.js": {
+    "bytes": 12492,
+    "sha256": "cc079d2ad80544b90fc1b4fed2c4c33c4706a519546623eb5bbc849eb0b45ef0"
+  },
+  "src/audio.js": {
+    "bytes": 4572,
+    "sha256": "09ad16773243beb1466deedb8f30b20b54c5dab04d145072ab88decc0f7a5e7e"
+  },
+  "src/compatibility.js": {
+    "bytes": 11519,
+    "sha256": "14a954e6cd59e150c6709a5724959afd0bfbb31d814923c054639478c1c2cac3"
+  },
+  "src/director.js": {
+    "bytes": 4510,
+    "sha256": "ee8f920134f7c5329aceddd6e951106c0ce63c4192cc12f0159f46ef89a028c9"
+  },
+  "src/export.js": {
+    "bytes": 3731,
+    "sha256": "489d6aabc471bfedc2646ac12a92fea5cb1f7e7c12117654716b8e32e5182a4a"
+  },
+  "src/renderer.js": {
+    "bytes": 12584,
+    "sha256": "7bd456e17341db85c28c3b7ec6bb33f162b4fe490e8565b4a02b8907f694be51"
+  },
+  "style.css": {
+    "bytes": 12501,
+    "sha256": "cd8c826773384b1670f3c3d897b6e4fffa27690b3705b0dc9bd1fef2b4ecfa22"
+  },
+  "tests/browser-results.json": {
+    "bytes": 776,
+    "sha256": "86cc0deae6848c2da71065d4dae2d782df8ae3174ee23f3a9ea0dfc5411741ad"
+  },
+  "tests/browser_smoke.py": {
+    "bytes": 6646,
+    "sha256": "171539e5b616c8f6671f059fa2597f9f222188048b3c3c5295187d808f53b5a5"
+  },
+  "tests/director.test.mjs": {
+    "bytes": 1396,
+    "sha256": "0e210205154b6827f70547e9d9f978b60a6687856cd87aa7267604aec9bd09eb"
+  },
+  "tools/build_compat.py": {
+    "bytes": 4517,
+    "sha256": "8273d7c093717654ed37ede9337f0ddade5c03b9ba2e1fec9384451f0525b55b"
+  },
+  "tools/build_single.py": {
+    "bytes": 1618,
+    "sha256": "d0750b3cda674c00cd3faec841b884d3ecd0d0d03cda7a5b0b608193bce2e9e9"
+  },
+  "tools/capture.py": {
+    "bytes": 4868,
+    "sha256": "03c68d40ba980174106dd6c5174cd0f7bf1a17dbb69aa510349d9d116ba2fdb6"
+  },
+  "tools/fetch_music.py": {
+    "bytes": 2505,
+    "sha256": "842440090d299c5134d9c23fe81db47d489ce2dd92f476802b66e2c1ed163d1c"
+  },
+  "tools/serve.py": {
+    "bytes": 1608,
+    "sha256": "fcbc573a01a2645616decdd8f6557f7447b2104edd87b671d5b46238d2b22e9f"
+  }
+}

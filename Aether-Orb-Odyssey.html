@@ -1,0 +1,636 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#05060a">
+<meta name="description" content="Aether Orb. A cinematic real-time WebGPU concept film by CrystalBall. Music: Richard Strauss, performed by Kevin MacLeod.">
+<title>Aether Orb — Odyssey / CrystalBall</title>
+<style>
+:root{color-scheme:dark;--ink:#eeeff3;--muted:#9598a4;--line:rgba(221,228,255,.16);font-family:"Helvetica Neue",Helvetica,Arial,sans-serif;font-synthesis:none;background:#04050a;color:var(--ink)}
+*{box-sizing:border-box}html,body{width:100%;height:100%;margin:0;overflow:hidden}button,a,input,select{-webkit-tap-highlight-color:transparent}button,input,select{font:inherit}button,a,select{touch-action:manipulation}button{color:inherit;cursor:pointer}button:disabled{opacity:.45;cursor:progress}button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid #c4dcff;outline-offset:6px}a{color:inherit}button{background:none;border:0}button:hover{color:white}[hidden]{display:none!important}#stage{height:100dvh;width:100vw;position:relative;overflow:hidden;background:#04060b;isolation:isolate;container-type:size}#world{position:absolute;inset:0;width:100%;height:100%;display:block;z-index:-3}.film-shade{position:absolute;inset:0;z-index:-2;pointer-events:none;background:linear-gradient(90deg,rgba(3,4,9,.30),transparent 47%),linear-gradient(180deg,rgba(3,4,9,.48),transparent 15%,transparent 82%,rgba(3,4,9,.73));transition:opacity .8s}.playing .film-shade{opacity:.6}.masthead{position:absolute;top:max(30px,env(safe-area-inset-top));left:4.3%;right:4.3%;display:flex;align-items:center;justify-content:space-between;z-index:5}.wordmark{display:flex;align-items:center;gap:15px;text-decoration:none;letter-spacing:.38em;font-size:11px;font-weight:500}.brand-orbit{display:block;width:25px;height:25px;border:1px solid #cbd4e7;border-radius:50%;position:relative;transform:rotate(-28deg)}.brand-orbit:after{content:"";position:absolute;inset:7px -5px;border:1px solid #cbd4e7;border-radius:50%}.film-id{font-size:9px;letter-spacing:.22em;color:#999da9}.film-id i{font-style:normal;margin:0 16px;color:#5b6274}.eyebrow{font-size:10px;line-height:1.6;letter-spacing:.32em;font-weight:500;color:#bdc4d4;margin:0 0 25px}#gate{position:absolute;left:8.0%;top:24%;width:47%;z-index:2}#gateTitle{font-size:clamp(68px,8.8cqw,155px);line-height:.91;letter-spacing:-.065em;font-weight:200;margin:0 0 27px}#gateTitle span{display:block}.gate-tagline{font-size:clamp(14px,1.45cqw,23px);font-weight:300;letter-spacing:.035em;color:#adb3c5;margin:0 0 40px}.watch{padding:0;display:flex;align-items:center;gap:16px;text-transform:uppercase;letter-spacing:.18em;font-size:10px}.play-circle{height:48px;width:48px;border:1px solid rgba(234,239,255,.6);border-radius:50%;display:grid;place-items:center;font-size:12px;padding-left:2px;transition:background .2s,transform .2s}.watch:hover .play-circle{background:rgba(236,242,255,.12);transform:scale(1.06)}.watch-duration{font-size:10px;letter-spacing:.07em;color:#757e93;margin-left:8px}.load-status{font-size:10px;color:#868fa4;min-height:15px;line-height:1.5;max-width:340px;margin:14px 0 0 64px}.score-note{font-size:8px;letter-spacing:.20em;color:#687389;margin-top:35px;line-height:1.8}.score-note span{padding:0 5px}#filmType{position:absolute;left:8%;top:29%;max-width:68%;pointer-events:none;will-change:opacity;z-index:2}.film-type h2{font-size:clamp(40px,5.2cqw,99px);line-height:1.05;letter-spacing:-.055em;font-weight:300;margin:0}.film-type h2 .line{display:block;overflow:hidden;padding-bottom:.12em;margin-bottom:-.12em}.film-type h2 .line span{display:block;will-change:transform,opacity}.film-type[data-size="medium"] h2{font-size:clamp(34px,4.4cqw,80px)}.film-type[data-size="hero"] h2{font-size:clamp(54px,8.0cqw,145px);font-weight:200;letter-spacing:-.06em}.film-type[data-size="quiet"] h2{font-size:clamp(30px,4.4cqw,80px);font-weight:200;letter-spacing:.005em}.film-type[data-align="center"]{left:10%!important;right:10%;top:36%!important;max-width:80%;text-align:center}.film-type[data-align="center-top"]{left:8%!important;right:8%;top:17%!important;max-width:84%;text-align:center}.film-type #subtitle{font-size:clamp(9px,1cqw,17px);letter-spacing:.18em;color:#a9b5cb;line-height:1.6;margin-top:26px}.film-type[data-size="hero"] #subtitle{font-size:clamp(15px,1.5cqw,24px);letter-spacing:.02em;font-weight:300}#projectLink{pointer-events:auto;display:inline-flex;align-items:center;gap:38px;text-decoration:none;font-size:11px;letter-spacing:.07em;border-bottom:1px solid #8c9bb8;padding:16px 0 12px;margin-top:12px}#projectLink span{font-size:22px;font-weight:200}#projectLink:hover{border-color:white}.edition{position:absolute;bottom:113px;right:4.3%;display:flex;align-items:center;gap:10px;font-size:8px;letter-spacing:.16em;color:#8b96ae;z-index:4}.tiny-dot{width:3px;height:3px;border-radius:50%;background:#788cba}.transport{position:absolute;left:4.3%;right:4.3%;bottom:max(23px,env(safe-area-inset-bottom));z-index:10}.timebar{position:relative;height:19px;margin-bottom:8px}#scrub{width:100%;height:19px;margin:0;appearance:none;background:transparent;cursor:pointer;position:relative;z-index:2}#scrub::-webkit-slider-runnable-track{height:1px;background:linear-gradient(90deg,#cbdcf8 var(--progress,0%),rgba(221,231,255,.20) var(--progress,0%))}#scrub::-webkit-slider-thumb{appearance:none;width:7px;height:7px;border-radius:50%;background:#eef4ff;margin-top:-3px;opacity:0;transition:opacity .2s}.timebar:hover #scrub::-webkit-slider-thumb,#scrub:focus-visible::-webkit-slider-thumb{opacity:1}#scrub::-moz-range-track{height:1px;background:#697185}#scrub::-moz-range-thumb{height:7px;width:7px;background:#eef4ff;border:0}#chapterMarks{position:absolute;inset:7px 0;pointer-events:none;z-index:1}#chapterMarks i{position:absolute;width:1px;height:5px;background:#768199}.transport-row{display:flex;justify-content:space-between;align-items:center;gap:20px;height:36px}.controls-left,.controls-right{display:flex;align-items:center;gap:20px}.icon-button{width:30px;height:34px;display:grid;place-items:center;font-size:19px;padding:0;color:#b9c6dd}.icon-button#playPause{font-size:12px}.text-button{display:flex;align-items:center;gap:10px;font-size:10px;letter-spacing:.02em;padding:8px 0;color:#a4b1c8}.text-button span{color:#69768e}#timecode{font-size:10px;color:#adb8ca;letter-spacing:.03em;font-variant-numeric:tabular-nums;min-width:92px}#timecode i{font-style:normal;padding:0 8px;color:#586479}.sound-bars{display:flex;align-items:center;gap:2px;width:16px;height:12px}.sound-bars i{width:2px;height:6px;background:#c0cee6;display:block}.sound-bars i:nth-child(2){height:12px}.sound-bars i:nth-child(3){height:9px}.muted .sound-bars i{height:2px!important}#quality{border:1px solid rgba(155,176,211,.14);background:rgba(10,14,23,.75);padding:6px 9px;border-radius:2px;font-size:9px;color:#aebad0;cursor:pointer}#fullscreen{font-size:25px}#chapterSlug{position:absolute;left:4.3%;bottom:114px;color:#7986a0;font-size:8px;letter-spacing:.24em}.chrome{transition:opacity .6s}.playing.idle .chrome,.playing.idle #chapterSlug{opacity:0}.playing.idle .chrome:focus-within{opacity:1}.playing.idle{cursor:none}.playing.idle #world{cursor:none}#chapters{position:absolute;bottom:118px;left:4.3%;width:305px;padding:12px;background:rgba(6,9,16,.94);border:1px solid var(--line);backdrop-filter:blur(25px);z-index:12}#chapters button{display:flex;align-items:center;width:100%;gap:15px;padding:12px;text-align:left;font-size:12px}#chapters button:hover{background:#111827}#chapters button span{font-size:9px;color:#8592ab;font-variant-numeric:tabular-nums}#chapters button i{margin-left:auto;font-style:normal;font-size:9px;color:#748096}#assembly-labels{position:absolute;right:8%;top:26%;display:grid;gap:15cqh;opacity:0;pointer-events:none;z-index:2}#assembly-labels span{display:flex;align-items:center;gap:12px;font-size:9px;letter-spacing:.12em;color:#8495b1}#assembly-labels b{font-size:8px;font-weight:400;letter-spacing:.18em;color:#a8b7ce}#assembly-labels span:before{content:"";width:30px;height:1px;background:rgba(154,181,226,.4)}.audio-error,.fatal{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(550px,88vw);padding:32px;background:rgba(8,13,23,.97);border:1px solid #3a4860;z-index:30;box-shadow:0 20px 120px #000}.audio-error strong{font-size:22px;font-weight:400}.audio-error p,.fatal p{font-size:13px;line-height:1.75;color:#acb6c9}.audio-error>div{display:flex;flex-wrap:wrap;gap:12px}.audio-error button,.file-button,.fatal button,.primary-small{display:inline-block;padding:12px 16px;border:1px solid #7788a4;border-radius:2px;font-size:11px;cursor:pointer}.file-button input{display:none}.audio-error button:hover,.file-button:hover{background:#1d2c44}.fatal h2{font-size:32px;font-weight:300}.fatal code{color:#d0def9;font-size:11px;overflow-wrap:anywhere}dialog{width:min(570px,90vw);max-height:85dvh;color:#e5eaf2;background:#0a101b;border:1px solid #344058;padding:35px 38px;border-radius:4px;line-height:1.65}dialog::backdrop{background:rgba(0,0,0,.72);backdrop-filter:blur(10px)}dialog h2{font-weight:300;font-size:46px;letter-spacing:-.04em;line-height:1.06;margin:0 0 30px}dialog h3{font-size:13px;font-weight:500;margin-top:25px}dialog p{font-size:12px;color:#b4c1d5}dialog a{text-underline-offset:3px;color:#d1ddf2}dialog .muted{color:#7c8ba3;font-size:11px}.dialog-close{float:right;font-size:28px;font-weight:200}dialog summary{cursor:pointer;font-size:11px;color:#788dab;margin-top:20px}dialog pre{font-size:10px;white-space:pre-wrap;color:#8799b6}#recordStatus{display:inline-block;margin-left:15px;font-size:11px;color:#93b4db}.recording .chrome{opacity:0!important}.capture-mode .chrome,.capture-mode #chapterSlug,.capture-mode #assembly-labels{display:none!important}.capture-mode #gate{display:none!important}
+@media(max-width:760px){.masthead{top:23px;left:6%;right:6%}.wordmark{font-size:9px;gap:12px;letter-spacing:.29em}.brand-orbit{width:21px;height:21px}.film-id{font-size:7px;letter-spacing:.07em}.film-id i{margin:0 6px}#gate{left:8%;top:20%;width:80%}#gateTitle{font-size:19cqw;line-height:.9}.gate-tagline{font-size:17px;margin-bottom:24px}.eyebrow{font-size:8px;margin-bottom:20px}.watch{font-size:9px;gap:12px}.play-circle{width:41px;height:41px}.load-status{margin-left:54px;max-width:230px}.score-note{font-size:7px;max-width:200px;margin-top:23px}.edition{font-size:6px;right:6%;bottom:109px;gap:7px}.transport{left:6%;right:6%;bottom:24px}.transport-row{gap:10px}.controls-left,.controls-right{gap:8px}.icon-button{width:24px}.text-button{font-size:9px}#timecode{font-size:9px;min-width:76px}#timecode i{padding:0 4px}#soundLabel,#chaptersButton,#creditsButton{font-size:0}#chaptersButton:before{content:'☷';font-size:19px}#chaptersButton span{display:none}#creditsButton:before{content:'ⓘ';font-size:17px}#quality{font-size:8px;padding:5px 3px;max-width:69px}.controls-right{gap:10px}#filmType{left:8%;top:22%;max-width:87%}.film-type h2,.film-type[data-size="medium"] h2{font-size:9cqw}.film-type[data-size="hero"] h2{font-size:14cqw}.film-type[data-size="quiet"] h2{font-size:10cqw}.film-type[data-align="center"]{top:29%!important}.film-type[data-align="center-top"]{top:18%!important}.film-type #subtitle{font-size:8px;max-width:260px;line-height:1.9;margin-top:17px}.film-type[data-align="center"] #subtitle{margin-left:auto;margin-right:auto}.film-type[data-size="hero"] #subtitle{font-size:15px}.film-type .eyebrow{font-size:7px}#projectLink{font-size:10px;gap:22px;margin-top:7px}#assembly-labels{display:none}#chapterSlug{left:6%;font-size:7px;bottom:109px}dialog{padding:28px}dialog h2{font-size:39px}.watch-duration{font-size:9px}#chapters{left:6%;bottom:114px;width:88%}}
+@media(max-height:580px) and (min-width:761px){#gate{top:20%}#gateTitle{font-size:16cqh}.gate-tagline{margin-bottom:20px}.score-note{display:none}.masthead{top:18px}.edition,#chapterSlug{bottom:98px}#filmType{top:25%}.eyebrow{margin-bottom:16px}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;transition:none!important}/* The film never auto-plays; explicit playback remains available. */}
+
+/* Final composition: typography stays outside the product silhouette. */
+.film-type[data-align="center-top"]{top:7%!important}
+.film-type[data-align="center-top"] h2{font-size:5.8cqw}
+@media(max-width:760px){#filmType{top:12%}.film-type[data-align="center-top"]{top:10%!important}.film-type[data-align="center-top"] h2{font-size:12cqw}#gate{top:13%}#gateTitle{font-size:16cqw;white-space:nowrap}#gateTitle span{display:inline}#gateTitle span:before{content:' '}#gate .eyebrow{margin-bottom:17px}.gate-tagline{margin-bottom:20px}.score-note{display:none}#gateTitle{margin-bottom:16px}}
+
+</style>
+</head>
+<body>
+<main id="stage" aria-label="Aether Orb cinematic product film">
+ <canvas id="world" aria-label="Real-time three-dimensional Aether Orb animation"></canvas>
+ <div class="film-shade" aria-hidden="true"></div>
+ <header class="masthead chrome">
+  <a class="wordmark" href="https://github.com/wieslawsoltes/CrystalBall" target="_blank" rel="noopener noreferrer" aria-label="CrystalBall project"><span class="brand-orbit" aria-hidden="true"></span>CRYSTALBALL</a>
+  <span class="film-id">ODYSSEY <i>/</i> CONCEPT FILM 01</span>
+ </header>
+ <section id="gate" aria-labelledby="gateTitle">
+  <p class="eyebrow">A NEW KIND OF PRESENCE</p>
+  <h1 id="gateTitle">Aether<span>Orb.</span></h1>
+  <p class="gate-tagline">Ambient AI, reimagined.</p>
+  <button id="start" class="watch" disabled><span class="play-circle" aria-hidden="true">▶</span><span id="startLabel">Preparing the film</span><span class="watch-duration">01:26</span></button>
+  <p id="loadStatus" class="load-status" role="status">Initializing the WebGPU renderer…</p>
+  <p class="score-note">RICHARD STRAUSS <span>—</span> ALSO SPRACH ZARATHUSTRA</p>
+ </section>
+ <section id="filmType" class="film-type" aria-live="off" aria-label="Film titles" hidden>
+  <p id="kicker" class="eyebrow"></p><h2 id="titleLines"></h2><p id="subtitle"></p>
+  <a id="projectLink" class="project-link" href="https://github.com/wieslawsoltes/CrystalBall" target="_blank" rel="noopener noreferrer" hidden>Explore the project <span>↗</span></a>
+ </section>
+ <div id="assembly-labels" aria-hidden="true"><span>01 <b>LIGHT & FORM</b></span><span>02 <b>COMPUTE CONCEPT</b></span><span>03 <b>PHYSICAL PLATFORM</b></span></div>
+ <div id="chapterSlug" class="chapter-slug" aria-hidden="true"></div>
+ <div class="edition chrome"><span id="backend">NATIVE WEBGPU</span><span class="tiny-dot"></span><span>ENGINEERING CONCEPT</span></div>
+ <footer id="transport" class="transport chrome" aria-label="Film playback controls">
+  <div class="timebar"><input id="scrub" type="range" min="0" max="86.06" value="0" step="0.01" aria-label="Seek film"><div id="chapterMarks" aria-hidden="true"></div></div>
+  <div class="transport-row">
+   <div class="controls-left">
+    <button id="playPause" class="icon-button" aria-label="Play" title="Play / pause (Space)">▶</button>
+    <button id="restart" class="icon-button" aria-label="Replay from beginning" title="Replay (R)">↺</button>
+    <span id="timecode">00:00 <i>/</i> 01:26</span>
+    <button id="chaptersButton" class="text-button" aria-controls="chapters" aria-expanded="false">Chapters <span>⌃</span></button>
+   </div>
+   <div class="controls-right">
+    <button id="sound" class="text-button" aria-pressed="true" title="Mute (M)"><span class="sound-bars" aria-hidden="true"><i></i><i></i><i></i><i></i></span><span id="soundLabel">Sound on</span></button>
+    <select id="quality" aria-label="Render quality"><option value="preview">Preview</option><option value="balanced" selected>Balanced</option><option value="cinema">Cinema</option><option value="ultra">Ultra / 4K</option></select>
+    <button id="creditsButton" class="text-button">Credits</button>
+    <button id="fullscreen" class="icon-button" aria-label="Enter fullscreen" title="Fullscreen (F)">⛶</button>
+   </div>
+  </div>
+ </footer>
+ <nav id="chapters" aria-label="Film chapters" hidden></nav>
+ <div id="audioError" class="audio-error" role="alert" hidden><strong>The orchestra is not loaded.</strong><p id="audioErrorText"></p><div><button id="retryAudio">Retry score</button><label class="file-button">Choose audio<input id="audioFile" type="file" accept="audio/*"></label><button id="silent">Watch silent</button></div></div>
+ <div id="fatal" class="fatal" role="alert" hidden><p class="eyebrow">RENDERER STATUS</p><h2>WebGPU needs your attention.</h2><p id="fatalText"></p><p>Serve the folder with <code>python3 tools/serve.py</code> and open <code>http://localhost:8080</code>. Use a browser with WebGPU and hardware acceleration enabled.</p><button onclick="location.reload()">Retry</button> <button onclick="const u=new URL(location.href);u.searchParams.set('compat','1');location.href=u">WebGL2 compatibility</button></div>
+</main>
+<dialog id="credits">
+ <form method="dialog"><button class="dialog-close" aria-label="Close credits">×</button></form>
+ <p class="eyebrow">FILM NOTES & CREDITS</p><h2>Aether Orb<br>Odyssey.</h2>
+ <p>A real-time concept film. All geometry, light, glass, atmosphere, particles and camera motion are rendered live. The exploded assembly is a design visualization, not a verified production assembly.</p>
+ <h3>Music</h3><p><em>Also Sprach Zarathustra — Einleitung</em><br>Composition: Richard Strauss.<br>Recording: Kevin MacLeod.</p>
+ <p>Used under <a href="https://creativecommons.org/licenses/by/3.0/" target="_blank" rel="noopener noreferrer">Creative Commons Attribution 3.0</a>. <a href="https://commons.wikimedia.org/wiki/File:Also_Sprach_Zarathustra_-_Einleitung.ogg" target="_blank" rel="noopener noreferrer">Recording and source</a>. Synchronized to the animation; playback volume adjusted. This is not the film soundtrack master and no endorsement is implied.</p>
+ <p class="muted">The score loads from the local assets folder when present, otherwise from Wikimedia Commons, and is cached when the browser allows it. Locally selected replacement audio is never uploaded. The source and license above apply to the default recording only; update credits and obtain any necessary rights for replacement audio.</p>
+ <h3>Local capture</h3><p>Record the film with titles and sound in your browser. Export uses your current render resolution and codec support; it runs in real time.</p>
+ <button id="recordFilm" class="primary-small">Record film</button><span id="recordStatus" role="status"></span>
+ <p class="muted">Space: play/pause · ← / →: seek · R: replay · M: mute · F: fullscreen · C: credits.</p>
+ <details><summary>Renderer diagnostics</summary><pre id="diagnostics"></pre></details>
+</dialog>
+<script type="module">
+const INLINE_SHADERS={"common":"struct Uniforms {\n resolution: vec4f, // width, height, film seconds, aspect\n camera: vec4f, // xyz, tangent of half vertical field of view\n right: vec4f, // xyz, world: 0 dawn, 1 studio, 2 interior\n up: vec4f, // xyz, energy\n forward: vec4f, // xyz, exploded amount\n parameters: vec4f, // sunrise, film fade, volume steps, audio energy\n orb: vec4f, // xyz centre, radius\n extra: vec4f // render scale, reserved\n};\n@group(0) @binding(0) var<uniform> u: Uniforms;\nconst PI: f32 = 3.14159265359;\nfn saturate(x:f32)->f32{return clamp(x,0.0,1.0);}\nfn hash31(p:vec3f)->f32{var q=fract(p*.1031);q+=vec3f(dot(q,q.yzx+33.33));return fract((q.x+q.y)*q.z);}\nfn hash11(p:f32)->f32{return fract(sin(p*127.1)*43758.5453);}\nfn rotateX(p:vec3f,a:f32)->vec3f{let c=cos(a);let s=sin(a);return vec3f(p.x,c*p.y-s*p.z,s*p.y+c*p.z);}\nfn rotateY(p:vec3f,a:f32)->vec3f{let c=cos(a);let s=sin(a);return vec3f(c*p.x+s*p.z,p.y,-s*p.x+c*p.z);}\nfn rotateZ(p:vec3f,a:f32)->vec3f{let c=cos(a);let s=sin(a);return vec3f(c*p.x-s*p.y,s*p.x+c*p.y,p.z);}\nfn noise3(p:vec3f)->f32{\n let i=floor(p);let f=fract(p);let s=f*f*(3.0-2.0*f);\n return mix(mix(mix(hash31(i),hash31(i+vec3f(1,0,0)),s.x),mix(hash31(i+vec3f(0,1,0)),hash31(i+vec3f(1,1,0)),s.x),s.y),\n mix(mix(hash31(i+vec3f(0,0,1)),hash31(i+vec3f(1,0,1)),s.x),mix(hash31(i+vec3f(0,1,1)),hash31(i+vec3f(1,1,1)),s.x),s.y),s.z);\n}\nfn sphereHit(ro:vec3f,rd:vec3f,center:vec3f,r:f32)->vec2f{\n let q=ro-center;let b=dot(q,rd);let h=b*b-dot(q,q)+r*r;\n if(h<0.0){return vec2f(-1.0);}\n let s=sqrt(h);return vec2f(-b-s,-b+s);\n}\nfn direction(uv:vec2f)->vec3f{\n let q=vec2f(uv.x*2.0-1.0,1.0-uv.y*2.0);\n return normalize(u.forward.xyz+(q.x*u.resolution.w*u.right.xyz+q.y*u.up.xyz)*u.camera.w);\n}\nstruct VertexOut{@builtin(position) position:vec4f,@location(0) uv:vec2f};\n@vertex fn fullscreen(@builtin(vertex_index) i:u32)->VertexOut{\n var p=array<vec2f,3>(vec2f(-1,-1),vec2f(3,-1),vec2f(-1,3));var o:VertexOut;\n o.position=vec4f(p[i],0,1);o.uv=p[i]*vec2f(.5,-.5)+.5;return o;\n}\n","particles":"struct Particle {position:vec4f,color:vec4f};\n@group(1) @binding(0) var<storage,read_write> outputParticles:array<Particle>;\n@compute @workgroup_size(128) fn simulate(@builtin(global_invocation_id) id:vec3u){\n let i=id.x;if(i>=arrayLength(&outputParticles)){return;}\n let f=f32(i);let h=hash11(f*.871+3.12);let h2=hash11(f*2.131+9.4);let h3=hash11(f*.12+7.9);\n let t=u.resolution.z;let arm=f32(i%5u);let a=h*PI*2.0+t*(.14+h2*.09);\n let r=.23+h2*.61;let tube=.038*(h3-.5);\n var p=vec3f(cos(a)*r,tube+sin(a*3+t*.21)*.055,sin(a)*r);\n p=rotateX(rotateZ(p,arm*.63+.24),arm*.74+.40);\n p+=vec3f(sin(a*5+f)*tube,cos(a*4+f)*tube,0);\n let fade=(.26+.74*pow(.5+.5*sin(a*3-t*.41),4.0));\n let size=mix(.0009,.0033,pow(h3,7.0));\n outputParticles[i].position=vec4f(u.orb.xyz+p*u.orb.w,size);\n outputParticles[i].color=vec4f(mix(vec3f(.12,.55,1.0),vec3f(.71,.33,1.0),h2),fade*(.5+h3)*u.up.w);\n}\nstruct ParticleVertex{@builtin(position) position:vec4f,@location(0) uv:vec2f,@location(1) color:vec4f};\n@vertex fn particleVertex(@builtin(vertex_index) vi:u32,@builtin(instance_index) instance:u32)->ParticleVertex{\n var vertices=array<vec2f,6>(vec2f(-1,-1),vec2f(1,-1),vec2f(-1,1),vec2f(-1,1),vec2f(1,-1),vec2f(1,1));\n let p=outputParticles[instance];let d=p.position.xyz-u.camera.xyz;\n let depth=dot(d,u.forward.xyz);let xy=vec2f(dot(d,u.right.xyz)/u.resolution.w,dot(d,u.up.xyz))/u.camera.w;\n let corner=vertices[vi];let sz=p.position.w*2.3;\n var o:ParticleVertex;\n o.position=vec4f(xy+corner*vec2f(sz/u.resolution.w,sz)/u.camera.w,depth*.99,max(depth,.001));\n o.uv=corner;o.color=p.color;\n if(depth<.03||u.right.w<.5){o.position=vec4f(5,5,0,1);}\n return o;\n}\n@fragment fn particleFragment(in:ParticleVertex)->@location(0) vec4f{\n let r=dot(in.uv,in.uv);let glow=exp(-r*4.0)*(1-smoothstep(.55,1.0,r));\n return vec4f(in.color.rgb*in.color.a*glow*.85,0);\n}\n","post":"struct Post { size:vec4f, values:vec4f };\n@group(0) @binding(0) var inputTexture:texture_2d<f32>;\n@group(0) @binding(1) var texSampler:sampler;\n@group(0) @binding(2) var<uniform> post:Post;\nstruct V{@builtin(position) position:vec4f,@location(0) uv:vec2f};\n@vertex fn vs(@builtin(vertex_index) i:u32)->V{\n var p=array<vec2f,3>(vec2f(-1,-1),vec2f(3,-1),vec2f(-1,3));var o:V;o.position=vec4f(p[i],0,1);o.uv=p[i]*vec2f(.5,-.5)+.5;return o;\n}\n@fragment fn down(in:V)->@location(0) vec4f{\n let px=1.0/vec2f(textureDimensions(inputTexture));\n var c=textureSampleLevel(inputTexture,texSampler,in.uv+px*vec2f(-1,-1),0).rgb;\n c+=textureSampleLevel(inputTexture,texSampler,in.uv+px*vec2f(1,-1),0).rgb;\n c+=textureSampleLevel(inputTexture,texSampler,in.uv+px*vec2f(-1,1),0).rgb;\n c+=textureSampleLevel(inputTexture,texSampler,in.uv+px*vec2f(1,1),0).rgb;c*=.25;\n if(post.values.x>.5){let lum=max(max(c.r,c.g),c.b);c*=max(0.0,lum-.80)/max(lum,.001);}\n return vec4f(c,1);\n}\n@fragment fn blur(in:V)->@location(0) vec4f{\n let step=post.size.zw/vec2f(textureDimensions(inputTexture));\n var c=textureSampleLevel(inputTexture,texSampler,in.uv,0).rgb*.227027;\n c+=(textureSampleLevel(inputTexture,texSampler,in.uv+step*1.384615,0).rgb+textureSampleLevel(inputTexture,texSampler,in.uv-step*1.384615,0).rgb)*.316216;\n c+=(textureSampleLevel(inputTexture,texSampler,in.uv+step*3.230769,0).rgb+textureSampleLevel(inputTexture,texSampler,in.uv-step*3.230769,0).rgb)*.070270;\n return vec4f(c,1);\n}\n@group(0) @binding(3) var bloom0:texture_2d<f32>;\n@group(0) @binding(4) var bloom1:texture_2d<f32>;\n@group(0) @binding(5) var bloom2:texture_2d<f32>;\n@group(0) @binding(6) var bloom3:texture_2d<f32>;\nfn aces(c:vec3f)->vec3f{return clamp((c*(2.51*c+.03))/(c*(2.43*c+.59)+.14),vec3f(0),vec3f(1));}\n@fragment fn finish(in:V)->@location(0) vec4f{\n let uv=in.uv;let p=uv-.5;\n let chroma=p*dot(p,p)*.0009;\n var col=vec3f(textureSampleLevel(inputTexture,texSampler,uv+chroma,0).r,textureSampleLevel(inputTexture,texSampler,uv,0).g,textureSampleLevel(inputTexture,texSampler,uv-chroma,0).b);\n col+=textureSampleLevel(bloom0,texSampler,uv,0).rgb*.25;\n col+=textureSampleLevel(bloom1,texSampler,uv,0).rgb*.25;\n col+=textureSampleLevel(bloom2,texSampler,uv,0).rgb*.24;\n col+=textureSampleLevel(bloom3,texSampler,uv,0).rgb*.24;\n let vignette=1.0-dot(p*vec2f(.83,1.0),p*vec2f(.83,1.0))*.55;\n col=aces(col*1.30*vignette)*post.values.y;\n col=pow(col,vec3f(1.0/2.2));\n let hash=fract(sin(dot(floor(uv*post.size.xy),vec2f(12.9898,78.233))+floor(post.values.z*24)*.17)*43758.5453);\n col+=(hash-.5)*.0035;\n return vec4f(max(col,vec3f(0)),1);\n}\n","scene":"@group(0) @binding(1) var engraving: texture_2d<f32>;\n@group(0) @binding(2) var linearSampler: sampler;\n\nfn stars(rd:vec3f)->vec3f{\n var out=vec3f(0);let dir=rotateZ(rotateY(rd,.25),-.42);\n // Direction-space stars stay fixed in world space during camera motion.\n for(var j=0;j<3;j++) {\n  let scale=vec3f(210.0+f32(j)*97.0);\n  let p=dir*scale;let id=floor(p);let f=fract(p)-.5;\n  let h=hash31(id+f32(j)*7.13);let d=length(f);\n  let star=exp(-d*d*(170.0+f32(j)*80.0))*smoothstep(.925,.992,h);\n  out+=star*mix(vec3f(.64,.78,1.0),vec3f(1,.82,.66),h)*3.8;\n }\n let cloud=noise3(dir*4.2)*.65+noise3(dir*10.1)*.35;\n let band=exp(-pow(abs(dir.y+.12),2.0)*19.0);\n out+=vec3f(.034,.044,.072)*pow(cloud,3.0)*band;\n return out;\n}\nfn studio(rd:vec3f)->vec3f{\n let sky=mix(vec3f(.007,.009,.018),vec3f(.055,.061,.080),saturate(rd.y*.5+.5));\n let keyDirection=normalize(vec3f(-1.5,.75,1.35));\n let keyRight=normalize(cross(keyDirection,vec3f(0,1,0)));\n let keyUp=cross(keyRight,keyDirection);\n let key=(1-smoothstep(.042,.060,abs(dot(rd,keyRight))))*(1-smoothstep(.29,.35,abs(dot(rd,keyUp))))*smoothstep(.65,.8,dot(rd,keyDirection))*5.2;\n let strip=pow(max(dot(rd,normalize(vec3f(.80,.22,-.70))),0.0),100.0)*5.5;\n let overhead=pow(max(dot(rd,normalize(vec3f(-.1,1.0,.1))),0.0),32.0)*2.2;\n let soft=pow(max(dot(rd,normalize(vec3f(1.1,.7,1.2))),0.0),9.0)*.34;\n return sky+key*vec3f(.87,.94,1.0)+strip*vec3f(.39,.36,.9)+overhead*vec3f(.70,.83,1.0)+soft*vec3f(1.0,.81,.62);\n}\nfn atmosphere(ro:vec3f,rd:vec3f)->vec3f{\n let pc=vec3f(0,-18.45,-34);let pr=19.0;\n let sunDir=normalize(vec3f(.005,-.014+u.parameters.x*.116,-1));\n var color=stars(rd)*.68+vec3f(.0008,.0010,.0020);\n let angular=acos(clamp(dot(rd,sunDir),-.999999,.999999));\n color+=vec3f(1.0,.83,.53)*exp(-angular*angular*950.0)*(.25+u.parameters.x*2.0);\n color+=vec3f(1.0,.97,.81)*(1-smoothstep(.010,.013,angular))*7.0;\n let hit=sphereHit(ro,rd,pc,pr);\n if(hit.x>0.0){\n  let p=ro+rd*hit.x;let n=normalize(p-pc);let rim=pow(1.0-max(0.0,dot(n,-rd)),4.0);\n  let light=max(0.0,dot(n,sunDir));\n  let cloud=noise3(n*36.0)*.65+noise3(n*83.0)*.35;\n  color=vec3f(.0008,.0012,.0023)+vec3f(.014,.021,.032)*cloud*light;\n  color+=rim*vec3f(.15,.31,.54)*(.13+light*3.2);\n  color+=pow(rim,4.0)*vec3f(.8,.50,.20)*pow(max(dot(n,sunDir),0.0),.5)*u.parameters.x;\n } else {\n  let q=pc-ro;let closest=length(q-rd*max(dot(q,rd),0.0));\n  color+=vec3f(.18,.36,.65)*exp(-max(0.0,closest-pr)*15.0)*(.10+u.parameters.x*.5);\n }\n let moon=vec3f(0,4.8,-28);let mh=sphereHit(ro,rd,moon,1.65);\n if(mh.x>0.0 && (hit.x<0.0||mh.x<hit.x)) {\n  let n=normalize(ro+rd*mh.x-moon);let rim=pow(1-max(0.0,dot(n,-rd)),4.0);\n  let tex=noise3(n*32.0);\n  color=vec3f(.003,.0034,.004)*tex+vec3f(.29,.25,.18)*rim*.19;\n }\n // Very restrained anamorphic flare, not an opaque neon line.\n let flare=exp(-pow(rd.y-sunDir.y,2.0)*150000.0)*exp(-abs(rd.x-sunDir.x)*9.0);\n if(hit.x<0.0){color+=vec3f(.16,.25,.47)*flare*u.parameters.x*.6;}\n return color;\n}\nfn cylinder(p:vec3f,r:f32,h:f32)->f32 {\n let q=vec2f(length(p.xz)-r,abs(p.y)-h);return length(max(q,vec2f(0)))+min(max(q.x,q.y),0.0);\n}\nfn beveledCone(p:vec3f,bottom:f32,top:f32,h:f32,bevel:f32)->f32{\n let r=mix(bottom,top,saturate(p.y/(2*h)+.5));\n let q=vec2f(length(p.xz)-r,abs(p.y)-h);\n return length(max(q,vec2f(0)))+min(max(q.x,q.y),0.0)-bevel;\n}\nfn machinery(p:vec3f)->vec2f{\n let ex=u.forward.w;\n var d=beveledCone(p-vec3f(0,-.60+ex*.16,0),.915,.846,.178,.041);\n var mat=1.0;\n let foot=cylinder(p-vec3f(0,-.838,0),.942,.041)-.017;\n if(foot<d){d=foot;mat=2.0;}\n let lip=cylinder(p-vec3f(0,-.346+ex*.52,0),.853,.026)-.011;\n if(lip<d){d=lip;mat=1.0;}\n let led=length(vec2f(length(p.xz)-.847,p.y+.309-ex*.52))-.010;\n if(led<d){d=led;mat=3.0;}\n // Concept assembly: a separate substrate becomes visible only in the exploded shot.\n if(ex>.04){\n  let pcb=cylinder(p-vec3f(0,-.23+ex*.82,0),.74,.018)-.005;\n  if(pcb<d){d=pcb;mat=4.0;}\n  let disc=cylinder(p-vec3f(0,-.11+ex*1.13,0),.55,.010)-.005;\n  if(disc<d){d=disc;mat=5.0;}\n }\n return vec2f(d,mat);\n}\nfn machineryHit(ro:vec3f,rd:vec3f)->vec2f{\n let bounds=sphereHit(ro,rd,vec3f(0,-.21+u.forward.w*.4,0),1.50);\n if(bounds.y<0.0){return vec2f(-1.0);}\n var t=max(0.002,bounds.x);\n for(var i=0;i<76;i++) {\n  let d=machinery(ro+rd*t);\n  if(d.x<.0007*(1.0+t*.2)){return vec2f(t,d.y);}\n  t+=d.x*.72;\n  if(t>bounds.y){break;}\n }\n return vec2f(-1.0);\n}\nfn machineNormal(p:vec3f)->vec3f{\n let e=.0015;\n return normalize(vec3f(machinery(p+vec3f(e,0,0)).x-machinery(p-vec3f(e,0,0)).x,\n machinery(p+vec3f(0,e,0)).x-machinery(p-vec3f(0,e,0)).x,\n machinery(p+vec3f(0,0,e)).x-machinery(p-vec3f(0,0,e)).x));\n}\nfn machineColor(p:vec3f,n:vec3f,rd:vec3f,material:f32)->vec3f{\n let nv=max(dot(n,-rd),.001);let refl=reflect(rd,n);\n let fres=.56+.44*pow(1.0-nv,5.0);\n let angle=atan2(p.x,p.z);\n let brush=.988+.012*sin(p.y*2500.0+noise3(p*31.0)*2.0);\n var metal=studio(refl)*mix(vec3f(.42,.45,.51),vec3f(.83,.87,.95),pow(1.0-nv,3.0))*fres*brush;\n metal+=vec3f(.034,.034,.041)*max(dot(n,normalize(vec3f(-2,3,4))),0.0);\n let seam=1.0-smoothstep(.002,.009,abs(p.y+.747-u.forward.w*.16));\n metal*=1.0-seam*.80;\n if(material>1.5 && material<2.5){metal*=.15;}\n if(material>2.5 && material<3.5){return vec3f(.45,.68,1.0)*3.6*u.up.w;}\n if(material>3.5 && material<4.5){\n  let r=length(p.xz);let a=atan2(p.z,p.x);\n  let tracks=pow(.5+.5*sin(r*120.0),25.0)*.45+pow(.5+.5*sin(a*26.0),60.0)*.65;\n  return mix(vec3f(.008,.021,.02),vec3f(.65,.40,.115)*(.4+max(n.y,0.0)*.5),saturate(tracks)) + studio(refl)*.13;\n }\n if(material>4.5){return vec3f(.12,.22,.42)*studio(refl)+vec3f(.05,.08,.14);}\n // The wordmark is an engraved texture in object space, not a floating label.\n let uv=vec2f(.5+angle*.88,.5-(p.y+.59-u.forward.w*.16)/.115);\n if(all(uv>vec2f(0))&&all(uv<vec2f(1))&&p.z>0.0){\n  let etch=textureSampleLevel(engraving,linearSampler,uv,0.0).r;\n  metal=mix(metal,vec3f(.25,.29,.37)+studio(refl)*.06,etch*.9);\n }\n let led=exp(-pow((p.y+.705-u.forward.w*.16)*420.0,2.0))*(1-smoothstep(.024,.044,abs(angle)));\n metal+=vec3f(.32,.65,1.0)*led*2.0;\n return metal;\n}\nfn energyVolume(ro:vec3f,rd:vec3f,near:f32,far:f32,steps:f32)->vec3f{\n let len=max(0.0,far-near);let stride=len/max(steps,1.0);\n var sum=vec3f(0);var trans=1.0;\n let t=u.resolution.z;let core=u.orb.xyz;\n let start=near+stride*.5;\n for(var j=0;j<64;j++) {\n  if(f32(j)>=steps){break;}\n  let pos=ro+rd*(start+f32(j)*stride);let raw=(pos-core)/u.orb.w;\n  let q=rotateY(raw,t*.12);let radial=length(q);\n  let n=noise3(q*5.2+vec3f(0,t*.04,0));\n  let n2=noise3(q*12.1-vec3f(t*.02,0,0));\n  let haze=pow(max(0.0,n*.7+n2*.3-.38),2.0)*3.0*(1-smoothstep(.72,1.0,radial));\n  var density=haze*.25;var emitted=mix(vec3f(.17,.04,.42),vec3f(.045,.13,.35),n)*haze*.28;\n  for(var k=0;k<3;k++){\n   let f=f32(k);var v=rotateZ(rotateX(q,.35+f*1.04+t*.025),f*.77+t*.05);\n   let rr=length(v.xz);let a=atan2(v.z,v.x);\n   let path=.49+f*.095+.04*sin(a*3.0+t*.18+f*2.0);\n   let torus=length(vec2f(rr-path,v.y*.85+.062*sin(a*2.0-t*.1+f)));\n   let variance=.00011+f*.000025;\n   let footprint=variance+stride*stride/12.0;\n   let filament=exp(-torus*torus/footprint)*sqrt(variance/footprint);\n   let shroud=exp(-torus*torus/.0020)*(.6+n2*.4);\n   let current=.34+.66*pow(.5+.5*sin(a*2.0-t*(.8+f*.18)+f),3.0);\n   emitted+=mix(vec3f(.080,.43,1.0),vec3f(.40,.20,.90),f*.44)*(filament*5.5+shroud*.28)*current;\n   density+=filament*.1+shroud*.055;\n  }\n  let heart=exp(-radial*radial/.0025);\n  emitted+=vec3f(.35,.69,1.0)*heart*4.5;\n  sum+=trans*emitted*stride*3.0*u.up.w;\n  trans*=exp(-density*stride*.72);\n }\n // A compact luminous source gives the trails a coherent centre.\n let d=length(cross(core-ro,rd));let nearest=dot(core-ro,rd);\n if(nearest>near && nearest<far){sum+=vec3f(.50,.83,1.0)*exp(-d*d/.0006)*1.3*u.up.w;}\n return sum;\n}\nfn glass(ro:vec3f,rd:vec3f,hit:vec2f,reflectionOnly:bool)->vec3f{\n let p=ro+rd*hit.x;let n=normalize(p-u.orb.xyz);\n let nv=max(0.0,dot(n,-rd));let fres=.035+.965*pow(1.0-nv,5.0);\n let inDir=refract(rd,n,1.0/1.46);\n let inStart=p+inDir*.002;let second=sphereHit(inStart,inDir,u.orb.xyz,u.orb.w);\n let exitPoint=inStart+inDir*max(second.y,0.0);let exitN=normalize(exitPoint-u.orb.xyz);\n let outDir=refract(inDir,-exitN,1.46);\n var backdrop=studio(normalize(outDir+vec3f(.00001)))*.20+stars(normalize(outDir+vec3f(.00001)))*.25;\n let shellAbsorb=exp(-vec3f(.09,.055,.015)*max(second.y,0.0));\n var steps=u.parameters.z;\n if(reflectionOnly){steps=12.0;}\n let inner=energyVolume(inStart,inDir,0,max(second.y,0.0),steps);\n var col=(backdrop*shellAbsorb+inner)*(1-fres*.80)+studio(reflect(rd,n))*fres;\n // A second, slightly displaced interface gives the glass shell a visible thickness.\n let rim=pow(1-nv,11.0);\n col+=rim*vec3f(.21,.31,.59)*.44;\n col+=pow(max(dot(reflect(rd,n),normalize(vec3f(-1.5,.75,1.35))),0.0),240.0)*vec3f(.7,.83,1.0)*2.0;\n return col;\n}\nfn product(ro:vec3f,rd:vec3f,reflected:bool)->vec4f{\n let ball=sphereHit(ro,rd,u.orb.xyz,u.orb.w);\n let solid=machineryHit(ro,rd);\n if(solid.x>0.0 && (ball.x<0.0||solid.x<ball.x)){\n  let p=ro+rd*solid.x;return vec4f(machineColor(p,machineNormal(p),rd,solid.y),solid.x);\n }\n if(ball.x>0.0){return vec4f(glass(ro,rd,ball,reflected),ball.x);}\n return vec4f(0,0,0,-1);\n}\n@fragment fn sceneFragment(in:VertexOut)->@location(0) vec4f{\n let ro=u.camera.xyz;let rd=direction(in.uv);\n if(u.right.w<.5){return vec4f(atmosphere(ro,rd),1);}\n if(u.right.w>1.5){\n  let h=sphereHit(ro,rd,u.orb.xyz,u.orb.w*1.28);\n  var col=energyVolume(ro,rd,max(h.x,0.0),max(h.y,0.0),u.parameters.z+12.0);\n  col+=stars(rd)*.14;return vec4f(col,1);\n }\n let hit=product(ro,rd,false);\n var col=vec3f(.0017,.0022,.0034)+stars(rd)*.045;\n if(hit.w>0.0){col=hit.rgb;}\n let ground=(-.906-ro.y)/rd.y;\n if(ground>0.0 && (hit.w<0.0||ground<hit.w)){\n  let p=ro+rd*ground;let n=vec3f(0,1,0);let refl=reflect(rd,n);\n  let rr=length(p.xz);let fres=.08+.70*pow(1-max(dot(n,-rd),0.0),5.0);\n  let reflection=product(p+vec3f(0,.005,0),refl,true);\n  let floorNoise=noise3(p*7.0)*.50+noise3(p*27.0)*.3+noise3(p*93.0)*.20;\n  col=vec3f(.004,.005,.008)+studio(refl)*.018*(.8+floorNoise*.2);\n  if(reflection.w>0.0){col+=reflection.rgb*fres*.67;}\n  let halo=exp(-rr*rr*1.35)*(.55+.45*floorNoise);\n  col+=vec3f(.024,.055,.14)*halo*u.up.w;\n  let contact=1.0-.9*exp(-rr*rr*1.7);\n  col*=contact+.10;\n  col=mix(vec3f(.0017,.0022,.0034)+stars(rd)*.045,col,smoothstep(.0,.17,abs(rd.y)));\n }\n return vec4f(col,1);\n}\n"};
+const INLINE_COMPAT="#version 300 es\nprecision highp float;\nprecision highp int;\nuniform sampler2D engraving;\nin vec2 vUv;\nout vec4 fragColor;\nstruct Uniforms{vec4 resolution;vec4 camera;vec4 right;vec4 up;vec4 forward;vec4 parameters;vec4 orb;vec4 extra;};\nuniform Uniforms u;\nconst float PI=3.14159265359;\nfloat saturate(float x){return clamp(x,0.0,1.0);}\nfloat hash31(vec3 p){vec3 q=fract(p*.1031);q+=vec3(dot(q,q.yzx+33.33));return fract((q.x+q.y)*q.z);}\nfloat hash11(float p){return fract(sin(p*127.1)*43758.5453);}\nvec3 rotateX(vec3 p,float a){float c=cos(a);float s=sin(a);return vec3(p.x,c*p.y-s*p.z,s*p.y+c*p.z);}\nvec3 rotateY(vec3 p,float a){float c=cos(a);float s=sin(a);return vec3(c*p.x+s*p.z,p.y,-s*p.x+c*p.z);}\nvec3 rotateZ(vec3 p,float a){float c=cos(a);float s=sin(a);return vec3(c*p.x-s*p.y,s*p.x+c*p.y,p.z);}\nfloat noise3(vec3 p){\n vec3 i=floor(p);vec3 f=fract(p);vec3 s=f*f*(3.0-2.0*f);\n return mix(mix(mix(hash31(i),hash31(i+vec3(1.0,0.0,0.0)),s.x),mix(hash31(i+vec3(0.0,1.0,0.0)),hash31(i+vec3(1.0,1.0,0.0)),s.x),s.y),\n mix(mix(hash31(i+vec3(0.0,0.0,1.0)),hash31(i+vec3(1.0,0.0,1.0)),s.x),mix(hash31(i+vec3(0.0,1.0,1.0)),hash31(i+vec3(1.0,1.0,1.0)),s.x),s.y),s.z);\n}\nvec2 sphereHit(vec3 ro,vec3 rd,vec3 center,float r){\n vec3 q=ro-center;float b=dot(q,rd);float h=b*b-dot(q,q)+r*r;\n if(h<0.0){return vec2(-1.0);}\n float s=sqrt(h);return vec2(-b-s,-b+s);\n}\nvec3 direction(vec2 uv){\n vec2 q=vec2(uv.x*2.0-1.0,1.0-uv.y*2.0);\n return normalize(u.forward.xyz+(q.x*u.resolution.w*u.right.xyz+q.y*u.up.xyz)*u.camera.w);\n}\nvec3 stars(vec3 rd){\n vec3 accumulated=vec3(0.0);vec3 dir=rotateZ(rotateY(rd,.25),-.42);\n // Direction-space stars stay fixed in world space during camera motion.\n for(int j=0;j<3;j++) {\n  vec3 scale=vec3(210.0+float(j)*97.0);\n  vec3 p=dir*scale;vec3 id=floor(p);vec3 f=fract(p)-.5;\n  float h=hash31(id+float(j)*7.13);float d=length(f);\n  float star=exp(-d*d*(170.0+float(j)*80.0))*smoothstep(.925,.992,h);\n  accumulated+=star*mix(vec3(.64,.78,1.0),vec3(1.0,.82,.66),h)*3.8;\n }\n float cloud=noise3(dir*4.2)*.65+noise3(dir*10.1)*.35;\n float band=exp(-pow(abs(dir.y+.12),2.0)*19.0);\n accumulated+=vec3(.034,.044,.072)*pow(cloud,3.0)*band;\n return accumulated;\n}\nvec3 studio(vec3 rd){\n vec3 sky=mix(vec3(.007,.009,.018),vec3(.055,.061,.080),saturate(rd.y*.5+.5));\n vec3 keyDirection=normalize(vec3(-1.5,.75,1.35));\n vec3 keyRight=normalize(cross(keyDirection,vec3(0.0,1.0,0.0)));\n vec3 keyUp=cross(keyRight,keyDirection);\n float key=(1.0-smoothstep(.042,.060,abs(dot(rd,keyRight))))*(1.0-smoothstep(.29,.35,abs(dot(rd,keyUp))))*smoothstep(.65,.8,dot(rd,keyDirection))*5.2;\n float strip=pow(max(dot(rd,normalize(vec3(.80,.22,-.70))),0.0),100.0)*5.5;\n float overhead=pow(max(dot(rd,normalize(vec3(-.1,1.0,.1))),0.0),32.0)*2.2;\n float soft=pow(max(dot(rd,normalize(vec3(1.1,.7,1.2))),0.0),9.0)*.34;\n return sky+key*vec3(.87,.94,1.0)+strip*vec3(.39,.36,.9)+overhead*vec3(.70,.83,1.0)+soft*vec3(1.0,.81,.62);\n}\nvec3 atmosphere(vec3 ro,vec3 rd){\n vec3 pc=vec3(0.0,-18.45,-34.0);float pr=19.0;\n vec3 sunDir=normalize(vec3(.005,-.014+u.parameters.x*.116,-1.0));\n vec3 color=stars(rd)*.68+vec3(.0008,.0010,.0020);\n float angular=acos(clamp(dot(rd,sunDir),-.999999,.999999));\n color+=vec3(1.0,.83,.53)*exp(-angular*angular*950.0)*(.25+u.parameters.x*2.0);\n color+=vec3(1.0,.97,.81)*(1.0-smoothstep(.010,.013,angular))*7.0;\n vec2 hit=sphereHit(ro,rd,pc,pr);\n if(hit.x>0.0){\n  vec3 p=ro+rd*hit.x;vec3 n=normalize(p-pc);float rim=pow(1.0-max(0.0,dot(n,-rd)),4.0);\n  float light=max(0.0,dot(n,sunDir));\n  float cloud=noise3(n*36.0)*.65+noise3(n*83.0)*.35;\n  color=vec3(.0008,.0012,.0023)+vec3(.014,.021,.032)*cloud*light;\n  color+=rim*vec3(.15,.31,.54)*(.13+light*3.2);\n  color+=pow(rim,4.0)*vec3(.8,.50,.20)*pow(max(dot(n,sunDir),0.0),.5)*u.parameters.x;\n } else {\n  vec3 q=pc-ro;float closest=length(q-rd*max(dot(q,rd),0.0));\n  color+=vec3(.18,.36,.65)*exp(-max(0.0,closest-pr)*15.0)*(.10+u.parameters.x*.5);\n }\n vec3 moon=vec3(0.0,4.8,-28.0);vec2 mh=sphereHit(ro,rd,moon,1.65);\n if(mh.x>0.0 && (hit.x<0.0||mh.x<hit.x)) {\n  vec3 n=normalize(ro+rd*mh.x-moon);float rim=pow(1.0-max(0.0,dot(n,-rd)),4.0);\n  float tex=noise3(n*32.0);\n  color=vec3(.003,.0034,.004)*tex+vec3(.29,.25,.18)*rim*.19;\n }\n // Very restrained anamorphic flare, not an opaque neon line.\n float flare=exp(-pow(rd.y-sunDir.y,2.0)*150000.0)*exp(-abs(rd.x-sunDir.x)*9.0);\n if(hit.x<0.0){color+=vec3(.16,.25,.47)*flare*u.parameters.x*.6;}\n return color;\n}\nfloat cylinder(vec3 p,float r,float h){\n vec2 q=vec2(length(p.xz)-r,abs(p.y)-h);return length(max(q,vec2(0.0)))+min(max(q.x,q.y),0.0);\n}\nfloat beveledCone(vec3 p,float bottom,float top,float h,float bevel){\n float r=mix(bottom,top,saturate(p.y/(2.0*h)+.5));\n vec2 q=vec2(length(p.xz)-r,abs(p.y)-h);\n return length(max(q,vec2(0.0)))+min(max(q.x,q.y),0.0)-bevel;\n}\nvec2 machinery(vec3 p){\n float ex=u.forward.w;\n float d=beveledCone(p-vec3(0.0,-.60+ex*.16,0.0),.915,.846,.178,.041);\n float mat=1.0;\n float foot=cylinder(p-vec3(0.0,-.838,0.0),.942,.041)-.017;\n if(foot<d){d=foot;mat=2.0;}\n float lip=cylinder(p-vec3(0.0,-.346+ex*.52,0.0),.853,.026)-.011;\n if(lip<d){d=lip;mat=1.0;}\n float led=length(vec2(length(p.xz)-.847,p.y+.309-ex*.52))-.010;\n if(led<d){d=led;mat=3.0;}\n // Concept assembly: a separate substrate becomes visible only in the exploded shot.\n if(ex>.04){\n  float pcb=cylinder(p-vec3(0.0,-.23+ex*.82,0.0),.74,.018)-.005;\n  if(pcb<d){d=pcb;mat=4.0;}\n  float disc=cylinder(p-vec3(0.0,-.11+ex*1.13,0.0),.55,.010)-.005;\n  if(disc<d){d=disc;mat=5.0;}\n }\n return vec2(d,mat);\n}\nvec2 machineryHit(vec3 ro,vec3 rd){\n vec2 bounds=sphereHit(ro,rd,vec3(0.0,-.21+u.forward.w*.4,0.0),1.50);\n if(bounds.y<0.0){return vec2(-1.0);}\n float t=max(0.002,bounds.x);\n for(int i=0;i<76;i++) {\n  vec2 d=machinery(ro+rd*t);\n  if(d.x<.0007*(1.0+t*.2)){return vec2(t,d.y);}\n  t+=d.x*.72;\n  if(t>bounds.y){break;}\n }\n return vec2(-1.0);\n}\nvec3 machineNormal(vec3 p){\n float e=.0015;\n return normalize(vec3(machinery(p+vec3(e,0.0,0.0)).x-machinery(p-vec3(e,0.0,0.0)).x,\n machinery(p+vec3(0.0,e,0.0)).x-machinery(p-vec3(0.0,e,0.0)).x,\n machinery(p+vec3(0.0,0.0,e)).x-machinery(p-vec3(0.0,0.0,e)).x));\n}\nvec3 machineColor(vec3 p,vec3 n,vec3 rd,float material){\n float nv=max(dot(n,-rd),.001);vec3 refl=reflect(rd,n);\n float fres=.56+.44*pow(1.0-nv,5.0);\n float angle=atan(p.x,p.z);\n float brush=.988+.012*sin(p.y*2500.0+noise3(p*31.0)*2.0);\n vec3 metal=studio(refl)*mix(vec3(.42,.45,.51),vec3(.83,.87,.95),pow(1.0-nv,3.0))*fres*brush;\n metal+=vec3(.034,.034,.041)*max(dot(n,normalize(vec3(-2.0,3.0,4.0))),0.0);\n float seam=1.0-smoothstep(.002,.009,abs(p.y+.747-u.forward.w*.16));\n metal*=1.0-seam*.80;\n if(material>1.5 && material<2.5){metal*=.15;}\n if(material>2.5 && material<3.5){return vec3(.45,.68,1.0)*3.6*u.up.w;}\n if(material>3.5 && material<4.5){\n  float r=length(p.xz);float a=atan(p.z,p.x);\n  float tracks=pow(.5+.5*sin(r*120.0),25.0)*.45+pow(.5+.5*sin(a*26.0),60.0)*.65;\n  return mix(vec3(.008,.021,.02),vec3(.65,.40,.115)*(.4+max(n.y,0.0)*.5),saturate(tracks)) + studio(refl)*.13;\n }\n if(material>4.5){return vec3(.12,.22,.42)*studio(refl)+vec3(.05,.08,.14);}\n // The wordmark is an engraved texture in object space, not a floating label.\n vec2 uv=vec2(.5+angle*.88,.5-(p.y+.59-u.forward.w*.16)/.115);\n if(all(greaterThan(uv,vec2(0.0)))&&all(lessThan(uv,vec2(1.0)))&&p.z>0.0){\n  float etch=textureLod(engraving,uv,0.0).r;\n  metal=mix(metal,vec3(.25,.29,.37)+studio(refl)*.06,etch*.9);\n }\n float led=exp(-pow((p.y+.705-u.forward.w*.16)*420.0,2.0))*(1.0-smoothstep(.024,.044,abs(angle)));\n metal+=vec3(.32,.65,1.0)*led*2.0;\n return metal;\n}\nvec3 energyVolume(vec3 ro,vec3 rd,float near,float far,float steps){\n float len=max(0.0,far-near);float stride=len/max(steps,1.0);\n vec3 sum=vec3(0.0);float trans=1.0;\n float t=u.resolution.z;vec3 core=u.orb.xyz;\n float start=near+stride*.5;\n for(int j=0;j<64;j++) {\n  if(float(j)>=steps){break;}\n  vec3 pos=ro+rd*(start+float(j)*stride);vec3 raw=(pos-core)/u.orb.w;\n  vec3 q=rotateY(raw,t*.12);float radial=length(q);\n  float n=noise3(q*5.2+vec3(0.0,t*.04,0.0));\n  float n2=noise3(q*12.1-vec3(t*.02,0.0,0.0));\n  float haze=pow(max(0.0,n*.7+n2*.3-.38),2.0)*3.0*(1.0-smoothstep(.72,1.0,radial));\n  float density=haze*.25;vec3 emitted=mix(vec3(.17,.04,.42),vec3(.045,.13,.35),n)*haze*.28;\n  for(int k=0;k<3;k++){\n   float f=float(k);vec3 v=rotateZ(rotateX(q,.35+f*1.04+t*.025),f*.77+t*.05);\n   float rr=length(v.xz);float a=atan(v.z,v.x);\n   float path=.49+f*.095+.04*sin(a*3.0+t*.18+f*2.0);\n   float torus=length(vec2(rr-path,v.y*.85+.062*sin(a*2.0-t*.1+f)));\n   float variance=.00011+f*.000025;\n   float footprint=variance+stride*stride/12.0;\n   float filament=exp(-torus*torus/footprint)*sqrt(variance/footprint);\n   float shroud=exp(-torus*torus/.0020)*(.6+n2*.4);\n   float current=.34+.66*pow(.5+.5*sin(a*2.0-t*(.8+f*.18)+f),3.0);\n   emitted+=mix(vec3(.080,.43,1.0),vec3(.40,.20,.90),f*.44)*(filament*5.5+shroud*.28)*current;\n   density+=filament*.1+shroud*.055;\n  }\n  float heart=exp(-radial*radial/.0025);\n  emitted+=vec3(.35,.69,1.0)*heart*4.5;\n  sum+=trans*emitted*stride*3.0*u.up.w;\n  trans*=exp(-density*stride*.72);\n }\n // A compact luminous source gives the trails a coherent centre.\n float d=length(cross(core-ro,rd));float nearest=dot(core-ro,rd);\n if(nearest>near && nearest<far){sum+=vec3(.50,.83,1.0)*exp(-d*d/.0006)*1.3*u.up.w;}\n return sum;\n}\nvec3 glass(vec3 ro,vec3 rd,vec2 hit,bool reflectionOnly){\n vec3 p=ro+rd*hit.x;vec3 n=normalize(p-u.orb.xyz);\n float nv=max(0.0,dot(n,-rd));float fres=.035+.965*pow(1.0-nv,5.0);\n vec3 inDir=refract(rd,n,1.0/1.46);\n vec3 inStart=p+inDir*.002;vec2 second=sphereHit(inStart,inDir,u.orb.xyz,u.orb.w);\n vec3 exitPoint=inStart+inDir*max(second.y,0.0);vec3 exitN=normalize(exitPoint-u.orb.xyz);\n vec3 outDir=refract(inDir,-exitN,1.46);\n vec3 backdrop=studio(normalize(outDir+vec3(.00001)))*.20+stars(normalize(outDir+vec3(.00001)))*.25;\n vec3 shellAbsorb=exp(-vec3(.09,.055,.015)*max(second.y,0.0));\n float steps=u.parameters.z;\n if(reflectionOnly){steps=12.0;}\n vec3 inner=energyVolume(inStart,inDir,0.0,max(second.y,0.0),steps);\n vec3 col=(backdrop*shellAbsorb+inner)*(1.0-fres*.80)+studio(reflect(rd,n))*fres;\n // A second, slightly displaced interface gives the glass shell a visible thickness.\n float rim=pow(1.0-nv,11.0);\n col+=rim*vec3(.21,.31,.59)*.44;\n col+=pow(max(dot(reflect(rd,n),normalize(vec3(-1.5,.75,1.35))),0.0),240.0)*vec3(.7,.83,1.0)*2.0;\n return col;\n}\nvec4 product(vec3 ro,vec3 rd,bool reflected){\n vec2 ball=sphereHit(ro,rd,u.orb.xyz,u.orb.w);\n vec2 solid=machineryHit(ro,rd);\n if(solid.x>0.0 && (ball.x<0.0||solid.x<ball.x)){\n  vec3 p=ro+rd*solid.x;return vec4(machineColor(p,machineNormal(p),rd,solid.y),solid.x);\n }\n if(ball.x>0.0){return vec4(glass(ro,rd,ball,reflected),ball.x);}\n return vec4(0.0,0.0,0.0,-1.0);\n}\nvec4 sceneFragment(){\n vec3 ro=u.camera.xyz;vec3 rd=direction(vUv);\n if(u.right.w<.5){return vec4(atmosphere(ro,rd),1.0);}\n if(u.right.w>1.5){\n  vec2 h=sphereHit(ro,rd,u.orb.xyz,u.orb.w*1.28);\n  vec3 col=energyVolume(ro,rd,max(h.x,0.0),max(h.y,0.0),u.parameters.z+12.0);\n  col+=stars(rd)*.14;return vec4(col,1.0);\n }\n vec4 hit=product(ro,rd,false);\n vec3 col=vec3(.0017,.0022,.0034)+stars(rd)*.045;\n if(hit.w>0.0){col=hit.rgb;}\n float ground=(-.906-ro.y)/rd.y;\n if(ground>0.0 && (hit.w<0.0||ground<hit.w)){\n  vec3 p=ro+rd*ground;vec3 n=vec3(0.0,1.0,0.0);vec3 refl=reflect(rd,n);\n  float rr=length(p.xz);float fres=.08+.70*pow(1.0-max(dot(n,-rd),0.0),5.0);\n  vec4 reflection=product(p+vec3(0.0,.005,0.0),refl,true);\n  float floorNoise=noise3(p*7.0)*.50+noise3(p*27.0)*.3+noise3(p*93.0)*.20;\n  col=vec3(.004,.005,.008)+studio(refl)*.018*(.8+floorNoise*.2);\n  if(reflection.w>0.0){col+=reflection.rgb*fres*.67;}\n  float halo=exp(-rr*rr*1.35)*(.55+.45*floorNoise);\n  col+=vec3(.024,.055,.14)*halo*u.up.w;\n  float contact=1.0-.9*exp(-rr*rr*1.7);\n  col*=contact+.10;\n  col=mix(vec3(.0017,.0022,.0034)+stars(rd)*.045,col,smoothstep(.0,.17,abs(rd.y)));\n }\n return vec4(col,1.0);\n}\nvoid main(){fragColor=sceneFragment();}\n";
+
+// -------- director.js --------
+/** Pure, deterministic film direction. All times are seconds, all dimensions are metres. */
+const DURATION = 86.06;
+const clamp = (x,a=0,b=1) => Math.max(a,Math.min(b,x));
+const ease = x => { x=clamp(x); return x*x*(3-2*x); };
+const mix = (a,b,t) => a+(b-a)*t;
+const vlerp = (a,b,t) => a.map((x,i)=>mix(x,b[i],t));
+const SHOTS = [
+ {name:'Dawn',start:0,end:14, camera:[[0,.15,7],[0,.45,6]], target:[[0,.25,-14],[0,.7,-14]],fov:[47,43],world:0,energy:[0,0],explode:[0,0]},
+ {name:'First light',start:14,end:24, camera:[[1.46,1.17,1.66],[2.55,1.40,2.48]],target:[[.12,.86,0],[0,.7,0]],fov:[32,34],world:1,energy:[.42,.82],explode:[0,0]},
+ {name:'Material',start:24,end:34,camera:[[1.02,-.13,1.68],[-.91,-.01,1.87]],target:[[.03,-.43,0],[0,-.32,0]],fov:[38,38],world:1,energy:[.52,.72],explode:[0,0]},
+ {name:'Presence',start:34,end:47,camera:[[2.55,1.55,5.8],[-1.80,1.35,5.5]],target:[[-.75,.30,0],[-.92,.45,0]],fov:[38,37],world:1,energy:[.80,1.12],explode:[0,0]},
+ {name:'Inner universe',start:47,end:57,camera:[[.07,.53,.72],[-.12,.54,-.16]],target:[[.18,.57,-1.25],[-.37,.28,-1.0]],fov:[70,82],world:2,energy:[.9,1.35],explode:[0,0]},
+ {name:'Architecture',start:57,end:69,camera:[[3.2,2.30,6.80],[1.95,1.74,6.4]],target:[[-.9,.70,0],[-.80,.8,0]],fov:[38,39],world:1,energy:[.65,.92],explode:[.18,1]},
+ {name:'Arrival',start:69,end:78,camera:[[-1.20,1.14,6.50],[.82,1.4,6.7]],target:[[0,.65,0],[0,.70,0]],fov:[41,41],world:1,energy:[1.3,1.18],explode:[.8,0]},
+ {name:'Aether Orb',start:78,end:DURATION,camera:[[2.10,1.45,6.10],[2.38,1.38,6.5]],target:[[-1,.45,0],[-1.08,.40,0]],fov:[37,36],world:1,energy:[.95,.76],explode:[0,0]}
+];
+const TITLES = [
+ {from:3,to:10.9,kicker:'CRYSTALBALL PRESENTS',lines:['A new dawn.'],align:'center',size:'quiet',sub:'FOR AMBIENT INTELLIGENCE'},
+ {from:17.0,to:22.8,kicker:'01 / FIRST LIGHT',lines:['Something','extraordinary.'],align:'left',size:'medium',sub:''},
+ {from:26,to:32.3,kicker:'02 / MATERIAL & LIGHT',lines:['Made to','be present.'],align:'left',size:'medium',sub:'A STUDY IN GLASS, LIGHT AND FORM'},
+ {from:35.4,to:45.6,kicker:'03 / A NEW KIND OF INTERFACE',lines:['Intelligence.','With presence.'],align:'left',size:'large',sub:'VOICE.  TEXT.  PRESENCE.'},
+ {from:49.8,to:55.9,kicker:'04 / INNER UNIVERSE',lines:['A universe.','Within reach.'],align:'center',size:'large',sub:''},
+ {from:59.1,to:67.8,kicker:'05 / THE PLATFORM VISION',lines:['Beautiful outside.','Possibility within.'],align:'left',size:'medium',sub:'HARDWARE  /  FIRMWARE  /  BROWSER PROTOTYPE'},
+ {from:70.5,to:76.9,kicker:'CRYSTALBALL',lines:['Aether Orb.'],align:'center-top',size:'hero',sub:''},
+ {from:79,to:86.06,kicker:'CRYSTALBALL',lines:['Aether Orb.'],align:'left',size:'hero',sub:'Ambient AI, reimagined.',cta:true}
+];
+function sampleFilm(time, aspect=16/9) {
+ const t=clamp(Number.isFinite(time)?time:0,0,DURATION);
+ const shot=SHOTS.find(s=>t<s.end)||SHOTS.at(-1);
+ const p=clamp((t-shot.start)/(shot.end-shot.start));
+ const e=ease(p);
+ let camera=vlerp(...shot.camera,e), target=vlerp(...shot.target,e), fov=mix(...shot.fov,e);
+ // Portrait is an actual reframing, not a crop of the landscape camera.
+ if(aspect<1.25 && shot.world!==0 && shot.world!==2 && shot.name!=='Material' && shot.name!=='First light') {
+   camera=camera.map((x,i)=>i===2?x*1.32:x);
+   target[0]*=.18; target[1]+=.58;
+ }
+ const explode=mix(...shot.explode,shot.name==='Arrival'?ease(p*1.65):e);
+ // Deliberate film cuts. Brief exposure dips conceal no loading or shader work.
+ const cut=shot.start===0?ease(t/2.7):.35+.65*ease((t-shot.start)/.42);
+ const outgoing=shot.end===DURATION?1:1-.60*ease((t-shot.end+.20)/.20);
+ const fade=cut*outgoing*(1-.88*ease((t-85.4)/.66));
+ const title=TITLES.find(x=>t>=x.from&&t<x.to)||null;
+ let titleOpacity=0,titleProgress=0;
+ if(title) {titleProgress=clamp((t-title.from)/1.25); titleOpacity=ease(titleProgress)*(title.cta?1:ease((title.to-t)/.7));}
+ return {time:t,shot,progress:p,camera,target,fov,world:shot.world,energy:mix(...shot.energy,e),explode,fade,
+   sun:ease(t/13.5),title,titleOpacity,titleProgress,portrait:aspect<1.25};
+}
+function cameraBasis(position,target) {
+ const normalize=v=>{const n=Math.hypot(...v)||1;return v.map(x=>x/n)};
+ const cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];
+ const forward=normalize(target.map((x,i)=>x-position[i]));
+ const right=normalize(cross(forward,[0,1,0]));
+ const up=normalize(cross(right,forward));
+ return {forward,right,up};
+}
+
+// -------- renderer.js --------
+
+const QUALITIES = {
+  preview: {pixels:580_000,steps:20,particles:4096},
+  balanced: {pixels:1_300_000,steps:32,particles:12288},
+  cinema: {pixels:2_100_000,steps:46,particles:24576},
+  ultra: {pixels:8_300_000,steps:52,particles:32768}
+};
+const HDR='rgba16float';
+const load=async name=>INLINE_SHADERS[name];
+
+/** Native WebGPU: analytic 3D ray tracing → compute particles → 4-level HDR bloom → film grade. */
+class FilmRenderer extends EventTarget {
+  constructor(canvas,{quality='balanced'}={}) {
+    super();this.canvas=canvas;this.quality=quality in QUALITIES?quality:'balanced';
+    this.values=new Float32Array(32);this.postValues=new Float32Array(8);
+    this.resources=[];this.ready=false;this.frames=0;this.gpuMs=0;this.errors=[];
+  }
+  async init() {
+    if(!navigator.gpu)throw new Error('WebGPU is not available. Open this page on HTTPS or localhost in a WebGPU-capable browser.');
+    const adapter=await navigator.gpu.requestAdapter({powerPreference:'high-performance'});
+    if(!adapter)throw new Error('No WebGPU adapter was returned. Check hardware acceleration in the browser settings.');
+    this.adapterInfo={...adapter.info};
+    this.device=await adapter.requestDevice();this.device.label='Aether Odyssey GPU';
+    this.device.lost.then(info=>{this.ready=false;this.dispatchEvent(new CustomEvent('lost',{detail:info.message||'GPU device lost.'}));});
+    this.device.addEventListener('uncapturederror',e=>{this.errors.push(e.error.message);console.error(e.error.message);this.dispatchEvent(new CustomEvent('error',{detail:e.error.message}));});
+    this.context=this.canvas.getContext('webgpu');
+    if(!this.context)throw new Error('Cannot create a WebGPU canvas context.');
+    this.format=navigator.gpu.getPreferredCanvasFormat();
+    this.context.configure({device:this.device,format:this.format,alphaMode:'opaque'});
+    const d=this.device;
+    const [common,scene,particles,post]=await Promise.all(['common','scene','particles','post'].map(load));
+    const particleRead=particles.slice(0,particles.indexOf('@compute')).replace('read_write','read')+particles.slice(particles.indexOf('struct ParticleVertex'));
+    const modules=await Promise.all([
+      this.module(common+scene,'3D ray tracing / glass / metal / atmosphere'),
+      this.module(common+particles.slice(0,particles.indexOf('struct ParticleVertex')),'Deterministic orbital particle compute'),
+      this.module(common+particleRead,'HDR particle rasterization'),
+      this.module(post,'Bloom and film grade')
+    ]);
+    this.uniform=d.createBuffer({label:'Film camera uniforms',size:128,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST});
+    this.sampler=d.createSampler({magFilter:'linear',minFilter:'linear',addressModeU:'clamp-to-edge',addressModeV:'clamp-to-edge'});
+    this.engraving=await this.makeEngraving();
+    const commonLayout=d.createBindGroupLayout({entries:[
+      {binding:0,visibility:GPUShaderStage.VERTEX|GPUShaderStage.FRAGMENT|GPUShaderStage.COMPUTE,buffer:{type:'uniform'}},
+      {binding:1,visibility:GPUShaderStage.FRAGMENT,texture:{}},
+      {binding:2,visibility:GPUShaderStage.FRAGMENT,sampler:{}}
+    ]});
+    this.commonGroup=d.createBindGroup({layout:commonLayout,entries:[
+      {binding:0,resource:{buffer:this.uniform}}, {binding:1,resource:this.engraving.createView()}, {binding:2,resource:this.sampler}
+    ]});
+    const writable=d.createBindGroupLayout({entries:[{binding:0,visibility:GPUShaderStage.COMPUTE,buffer:{type:'storage'}}]});
+    const readable=d.createBindGroupLayout({entries:[{binding:0,visibility:GPUShaderStage.VERTEX,buffer:{type:'read-only-storage'}}]});
+    this.particleBuffer=d.createBuffer({label:'32768 orbital particle records',size:32768*32,usage:GPUBufferUsage.STORAGE});
+    this.computeGroup=d.createBindGroup({layout:writable,entries:[{binding:0,resource:{buffer:this.particleBuffer}}]});
+    this.particleGroup=d.createBindGroup({layout:readable,entries:[{binding:0,resource:{buffer:this.particleBuffer}}]});
+    const targets=[{format:HDR}];
+    this.scenePipeline=await d.createRenderPipelineAsync({label:'Analytic world',layout:d.createPipelineLayout({bindGroupLayouts:[commonLayout]}),vertex:{module:modules[0],entryPoint:'fullscreen'},fragment:{module:modules[0],entryPoint:'sceneFragment',targets},primitive:{topology:'triangle-list'}});
+    this.computePipeline=await d.createComputePipelineAsync({label:'Orbit integration at absolute film time',layout:d.createPipelineLayout({bindGroupLayouts:[commonLayout,writable]}),compute:{module:modules[1],entryPoint:'simulate'}});
+    this.particlePipeline=await d.createRenderPipelineAsync({label:'Additive particle billboards',layout:d.createPipelineLayout({bindGroupLayouts:[commonLayout,readable]}),vertex:{module:modules[2],entryPoint:'particleVertex'},fragment:{module:modules[2],entryPoint:'particleFragment',targets:[{format:HDR,blend:{color:{srcFactor:'one',dstFactor:'one',operation:'add'},alpha:{srcFactor:'zero',dstFactor:'one',operation:'add'}}}]},primitive:{topology:'triangle-list'}});
+    const entries=[{binding:0,visibility:GPUShaderStage.FRAGMENT,texture:{}},{binding:1,visibility:GPUShaderStage.FRAGMENT,sampler:{}},{binding:2,visibility:GPUShaderStage.FRAGMENT,buffer:{type:'uniform'}}];
+    this.postLayout=d.createBindGroupLayout({entries});
+    this.finalLayout=d.createBindGroupLayout({entries:[...entries,...[3,4,5,6].map(binding=>({binding,visibility:GPUShaderStage.FRAGMENT,texture:{}}))]});
+    const postDesc=(entry,layout,format)=>({layout:d.createPipelineLayout({bindGroupLayouts:[layout]}),vertex:{module:modules[3],entryPoint:'vs'},fragment:{module:modules[3],entryPoint:entry,targets:[{format}]},primitive:{topology:'triangle-list'}});
+    [this.downPipeline,this.blurPipeline,this.finalPipeline]=await Promise.all([
+      d.createRenderPipelineAsync(postDesc('down',this.postLayout,HDR)),d.createRenderPipelineAsync(postDesc('blur',this.postLayout,HDR)),d.createRenderPipelineAsync(postDesc('finish',this.finalLayout,this.format))
+    ]);
+    this.finalUniform=d.createBuffer({size:32,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST});
+    this.ready=true;this.resize();return this;
+  }
+  async module(code,label) {
+    const module=this.device.createShaderModule({label,code});
+    const info=await module.getCompilationInfo();
+    const errors=info.messages.filter(x=>x.type==='error');
+    if(errors.length)throw new Error(`${label}\n${errors.map(x=>`${x.lineNum}:${x.linePos} ${x.message}`).join('\n')}`);
+    return module;
+  }
+  async makeEngraving() {
+    const c=document.createElement('canvas');c.width=1024;c.height=128;
+    const ctx=c.getContext('2d');ctx.fillStyle='#000';ctx.fillRect(0,0,1024,128);
+    ctx.fillStyle='#fff';ctx.font='300 44px Arial';ctx.textAlign='center';ctx.textBaseline='middle';
+    const letters='CRYSTALBALL';const spacing=66;
+    for(let i=0;i<letters.length;i++)ctx.fillText(letters[i],512+(i-(letters.length-1)/2)*spacing,64);
+    const texture=this.device.createTexture({label:'Engraved wordmark',size:[1024,128],format:'rgba8unorm',usage:GPUTextureUsage.TEXTURE_BINDING|GPUTextureUsage.COPY_DST|GPUTextureUsage.RENDER_ATTACHMENT});
+    this.device.queue.copyExternalImageToTexture({source:c},{texture},[1024,128]);return texture;
+  }
+  setQuality(quality) {if(!(quality in QUALITIES))throw new Error(`Unknown quality: ${quality}`);this.quality=quality;this.resize(true);}
+  texture(w,h,label) {
+    const t=this.device.createTexture({label,size:[w,h],format:HDR,usage:GPUTextureUsage.RENDER_ATTACHMENT|GPUTextureUsage.TEXTURE_BINDING});this.resources.push(t);return t;
+  }
+  makePostGroup(texture,values) {
+    const buffer=this.device.createBuffer({size:32,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST});
+    this.device.queue.writeBuffer(buffer,0,new Float32Array(values));this.resources.push(buffer);
+    return this.device.createBindGroup({layout:this.postLayout,entries:[{binding:0,resource:texture.createView()},{binding:1,resource:this.sampler},{binding:2,resource:{buffer}}]});
+  }
+  resize(force=false,width=0,height=0) {
+    if(!this.ready)return;
+    const rect=this.canvas.getBoundingClientRect();const dpr=Math.min(devicePixelRatio||1,2);
+    let w=Math.round(width||rect.width*dpr),h=Math.round(height||rect.height*dpr);
+    if(w<2||h<2)return;
+    const max=this.device.limits.maxTextureDimension2D;
+    let scale=Math.min(1,Math.sqrt(QUALITIES[this.quality].pixels/(w*h)),max/w,max/h);
+    if(width&&height)scale=Math.min(1,max/w,max/h);
+    w=Math.max(2,Math.round(w*scale/2)*2);h=Math.max(2,Math.round(h*scale/2)*2);
+    if(!force&&this.width===w&&this.height===h)return;
+    for(const resource of this.resources)resource.destroy();this.resources=[];
+    this.width=this.canvas.width=w;this.height=this.canvas.height=h;
+    this.hdr=this.texture(w,h,'Full HDR scene');this.hdrView=this.hdr.createView();
+    this.bloom=[];let prev=this.hdr;this.passes=[];
+    for(let i=0;i<4;i++) {
+      const bw=Math.max(2,w>>(i+1)),bh=Math.max(2,h>>(i+1));
+      const a=this.texture(bw,bh,`Bloom ${i} / vertical`),b=this.texture(bw,bh,`Bloom ${i} / horizontal`);
+      this.passes.push({pipeline:this.downPipeline,group:this.makePostGroup(prev,[bw,bh,0,0,i===0?1:0,0,0,0]),view:a.createView()});
+      this.passes.push({pipeline:this.blurPipeline,group:this.makePostGroup(a,[bw,bh,1,0,0,0,0,0]),view:b.createView()});
+      this.passes.push({pipeline:this.blurPipeline,group:this.makePostGroup(b,[bw,bh,0,1,0,0,0,0]),view:a.createView()});
+      this.bloom.push(a);prev=a;
+    }
+    this.finalGroup=this.device.createBindGroup({layout:this.finalLayout,entries:[
+      {binding:0,resource:this.hdrView},{binding:1,resource:this.sampler},{binding:2,resource:{buffer:this.finalUniform}},
+      ...this.bloom.map((t,i)=>({binding:i+3,resource:t.createView()}))
+    ]});
+  }
+  drawPass(encoder,pipeline,group,view,label='Post process') {
+    const pass=encoder.beginRenderPass({label,colorAttachments:[{view,loadOp:'clear',storeOp:'store',clearValue:{r:0,g:0,b:0,a:1}}]});
+    pass.setPipeline(pipeline);pass.setBindGroup(0,group);pass.draw(3);pass.end();
+  }
+  async render(film,{audioEnergy=0,wait=false}={}) {
+    if(!this.ready)return;
+    const start=performance.now();const {forward,right,up}=cameraBasis(film.camera,film.target);const q=QUALITIES[this.quality];
+    this.values.set([this.width,this.height,film.time,this.width/this.height],0);
+    this.values.set([...film.camera,Math.tan(film.fov*Math.PI/360)],4);
+    this.values.set([...right,film.world],8);this.values.set([...up,film.energy*(1+Math.min(.12,audioEnergy*.12))],12);
+    this.values.set([...forward,film.explode],16);
+    this.values.set([film.sun,film.fade,q.steps,audioEnergy],20);
+    this.values.set([0,.47+film.explode*1.44,0,1.15],24);
+    this.values.set([1,0,0,0],28);
+    this.device.queue.writeBuffer(this.uniform,0,this.values);
+    this.postValues.set([this.width,this.height,0,0,0,film.fade,film.time,0]);
+    this.device.queue.writeBuffer(this.finalUniform,0,this.postValues);
+    const enc=this.device.createCommandEncoder({label:`Film ${film.time.toFixed(3)}`});
+    if(film.world>.5){const cp=enc.beginComputePass({label:'Time-addressable particle field'});cp.setPipeline(this.computePipeline);cp.setBindGroup(0,this.commonGroup);cp.setBindGroup(1,this.computeGroup);cp.dispatchWorkgroups(Math.ceil(q.particles/128));cp.end();}
+    this.drawPass(enc,this.scenePipeline,this.commonGroup,this.hdrView,'Ray-trace analytic world');
+    if(film.world>.5) {
+      const pass=enc.beginRenderPass({label:'Luminous orbital particles',colorAttachments:[{view:this.hdrView,loadOp:'load',storeOp:'store'}]});
+      pass.setPipeline(this.particlePipeline);pass.setBindGroup(0,this.commonGroup);pass.setBindGroup(1,this.particleGroup);pass.draw(6,q.particles);pass.end();
+    }
+    for(const p of this.passes)this.drawPass(enc,p.pipeline,p.group,p.view);
+    this.drawPass(enc,this.finalPipeline,this.finalGroup,this.context.getCurrentTexture().createView(),'Tone mapping / fine grain');
+    this.device.queue.submit([enc.finish()]);this.frames++;
+    if(wait){await this.device.queue.onSubmittedWorkDone();this.gpuMs=this.gpuMs*.9+(performance.now()-start)*.1;}
+  }
+  dispose(){this.ready=false;for(const r of this.resources)r.destroy();this.uniform?.destroy();this.finalUniform?.destroy();this.particleBuffer?.destroy();this.engraving?.destroy();this.context?.unconfigure();this.device?.destroy();}
+}
+
+// -------- compatibility.js --------
+/** WebGL2 compatibility, explicitly labelled. Native WebGPU is never misrepresented. */
+const GL_VERTEX=`#version 300 es
+precision highp float;out vec2 vUv;
+void main(){vec2 p=gl_VertexID==0?vec2(-1,-1):gl_VertexID==1?vec2(3,-1):vec2(-1,3);gl_Position=vec4(p,0,1);vUv=p*vec2(.5,-.5)+.5;}`;
+const GL_POST_VERTEX=GL_VERTEX.replace('vec2(.5,-.5)','vec2(.5,.5)');
+const GL_POST=`#version 300 es
+precision highp float;in vec2 vUv;out vec4 fragColor;uniform sampler2D inputTexture;uniform sampler2D bloom0;uniform sampler2D bloom1;uniform sampler2D bloom2;uniform sampler2D bloom3;uniform vec4 settings;uniform vec4 params;
+vec3 aces(vec3 c){return clamp((c*(2.51*c+.03))/(c*(2.43*c+.59)+.14),0.,1.);}
+void main(){vec2 uv=vUv;vec3 c;
+ if(settings.x<.5){vec2 px=1./vec2(textureSize(inputTexture,0));c=(texture(inputTexture,uv+px*vec2(-1,-1)).rgb+texture(inputTexture,uv+px*vec2(1,-1)).rgb+texture(inputTexture,uv+px*vec2(-1,1)).rgb+texture(inputTexture,uv+px*vec2(1,1)).rgb)*.25;if(settings.y>.5){float lum=max(c.r,max(c.g,c.b));c*=max(0.,lum-.80)/max(lum,.001);}}
+ else if(settings.x<1.5){vec2 step=settings.zw/vec2(textureSize(inputTexture,0));c=texture(inputTexture,uv).rgb*.227027;c+=(texture(inputTexture,uv+step*1.384615).rgb+texture(inputTexture,uv-step*1.384615).rgb)*.316216;c+=(texture(inputTexture,uv+step*3.230769).rgb+texture(inputTexture,uv-step*3.230769).rgb)*.070270;}
+ else {vec2 p=uv-.5;vec2 chroma=p*dot(p,p)*.0009;c=vec3(texture(inputTexture,uv+chroma).r,texture(inputTexture,uv).g,texture(inputTexture,uv-chroma).b);c+=texture(bloom0,uv).rgb*.25+texture(bloom1,uv).rgb*.25+texture(bloom2,uv).rgb*.24+texture(bloom3,uv).rgb*.24;float vignette=1.-dot(p*vec2(.83,1.),p*vec2(.83,1.))*.55;c=pow(aces(c*1.30*vignette)*params.x,vec3(1./2.2));float grain=fract(sin(dot(floor(uv*params.zw),vec2(12.9898,78.233))+floor(params.y*24.)*.17)*43758.5453);c+=(grain-.5)*.0035;}
+ fragColor=vec4(max(c,0.),1.);}`;
+const GL_PARTICLE_VERTEX=`#version 300 es
+precision highp float;uniform vec4 cam;uniform vec4 right;uniform vec4 up;uniform vec4 forward;uniform vec4 orb;uniform vec4 film;out vec2 particleUV;out vec4 particleColor;
+float h(float x){return fract(sin(x*127.1)*43758.5453);}vec3 rx(vec3 p,float a){float c=cos(a),s=sin(a);return vec3(p.x,c*p.y-s*p.z,s*p.y+c*p.z);}vec3 rz(vec3 p,float a){float c=cos(a),s=sin(a);return vec3(c*p.x-s*p.y,s*p.x+c*p.y,p.z);}
+void main(){float f=float(gl_InstanceID),r1=h(f*.871+3.12),r2=h(f*2.131+9.4),r3=h(f*.12+7.9);float t=film.x,arm=float(gl_InstanceID%5),a=r1*6.283185+t*(.14+r2*.09),r=.23+r2*.61,tube=.038*(r3-.5);vec3 p=vec3(cos(a)*r,tube+sin(a*3.+t*.21)*.055,sin(a)*r);p=rx(rz(p,arm*.63+.24),arm*.74+.40);p+=vec3(sin(a*5.+f)*tube,cos(a*4.+f)*tube,0);p=orb.xyz+p*orb.w;vec3 d=p-cam.xyz;float z=dot(d,forward.xyz);vec2 xy=vec2(dot(d,right.xyz)/film.y,dot(d,up.xyz))/cam.w;vec2 c=gl_VertexID==0?vec2(-1,-1):gl_VertexID==1?vec2(1,-1):gl_VertexID==2?vec2(-1,1):gl_VertexID==3?vec2(-1,1):gl_VertexID==4?vec2(1,-1):vec2(1,1);float size=mix(.0009,.0033,pow(r3,7.))*2.3;gl_Position=vec4(xy+c*vec2(size/film.y,size)/cam.w,z*.99,max(z,.001));if(z<.03)gl_Position=vec4(5,5,0,1);particleUV=c;particleColor=vec4(mix(vec3(.12,.55,1.),vec3(.71,.33,1.),r2),(.26+.74*pow(.5+.5*sin(a*3.-t*.41),4.))*(.5+r3)*film.z);}`;
+const GL_PARTICLE_FRAGMENT=`#version 300 es
+precision highp float;in vec2 particleUV;in vec4 particleColor;out vec4 fragColor;void main(){float r=dot(particleUV,particleUV);float g=exp(-r*4.)*(1.-smoothstep(.55,1.,r));fragColor=vec4(particleColor.rgb*particleColor.a*g*.85,0);}`;
+const GL_QUALITY={preview:{pixels:580000,steps:20,particles:4096},balanced:{pixels:1300000,steps:32,particles:12288},cinema:{pixels:2100000,steps:46,particles:24576},ultra:{pixels:8300000,steps:52,particles:32768}};
+const loadCompat=async()=>INLINE_COMPAT;
+class CompatibilityRenderer extends EventTarget {
+ constructor(canvas,{quality='balanced'}={}){super();this.canvas=canvas;this.quality=quality in GL_QUALITY?quality:'balanced';this.errors=[];this.frames=0;this.gpuMs=0;this.resources=[];this.backend='WebGL2 compatibility';}
+ async init(){
+  const gl=this.gl=this.canvas.getContext('webgl2',{alpha:false,antialias:false,preserveDrawingBuffer:true,powerPreference:'high-performance'});
+  if(!gl)throw new Error('Neither WebGPU nor the WebGL2 compatibility renderer is available.');
+  if(!gl.getExtension('EXT_color_buffer_float'))throw new Error('Floating-point render targets are unavailable.');
+  gl.getExtension('OES_texture_float_linear');this.scene=this.program(GL_VERTEX,await loadCompat());this.post=this.program(GL_POST_VERTEX,GL_POST);this.particles=this.program(GL_PARTICLE_VERTEX,GL_PARTICLE_FRAGMENT);
+  this.vao=gl.createVertexArray();gl.bindVertexArray(this.vao);
+  this.device={queue:{onSubmittedWorkDone:async()=>{gl.finish();}},limits:{maxTextureDimension2D:gl.getParameter(gl.MAX_TEXTURE_SIZE)}};
+  const debug=gl.getExtension('WEBGL_debug_renderer_info');this.adapterInfo={backend:this.backend,renderer:debug?gl.getParameter(debug.UNMASKED_RENDERER_WEBGL):gl.getParameter(gl.RENDERER)};
+  const c=document.createElement('canvas');c.width=1024;c.height=128;const ctx=c.getContext('2d');ctx.fillStyle='#000';ctx.fillRect(0,0,1024,128);ctx.fillStyle='#fff';ctx.font='300 44px Arial';ctx.textAlign='center';ctx.textBaseline='middle';const letters='CRYSTALBALL';for(let i=0;i<letters.length;i++)ctx.fillText(letters[i],512+(i-(letters.length-1)/2)*66,64);
+  this.engraving=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,this.engraving);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,c);this.textureParams();
+  this.canvas.addEventListener('webglcontextlost',e=>{e.preventDefault();this.ready=false;this.dispatchEvent(new CustomEvent('lost',{detail:'The WebGL2 compatibility context was lost.'}));});
+  this.ready=true;this.resize();return this;
+ }
+ program(vs,fs){const g=this.gl;const compile=(type,source)=>{const s=g.createShader(type);g.shaderSource(s,source);g.compileShader(s);if(!g.getShaderParameter(s,g.COMPILE_STATUS)){const msg=g.getShaderInfoLog(s);this.errors.push(msg);throw new Error(msg);}return s;};const p=g.createProgram();const v=compile(g.VERTEX_SHADER,vs),f=compile(g.FRAGMENT_SHADER,fs);g.attachShader(p,v);g.attachShader(p,f);g.linkProgram(p);g.deleteShader(v);g.deleteShader(f);if(!g.getProgramParameter(p,g.LINK_STATUS))throw new Error(g.getProgramInfoLog(p));return {p,locations:new Map()};}
+ location(p,n){if(!p.locations.has(n))p.locations.set(n,this.gl.getUniformLocation(p.p,n));return p.locations.get(n);}
+ v4(p,n,a){this.gl.uniform4fv(this.location(p,n),a);}
+ textureParams(){const g=this.gl;g.texParameteri(g.TEXTURE_2D,g.TEXTURE_MIN_FILTER,g.LINEAR);g.texParameteri(g.TEXTURE_2D,g.TEXTURE_MAG_FILTER,g.LINEAR);g.texParameteri(g.TEXTURE_2D,g.TEXTURE_WRAP_S,g.CLAMP_TO_EDGE);g.texParameteri(g.TEXTURE_2D,g.TEXTURE_WRAP_T,g.CLAMP_TO_EDGE);}
+ target(w,h){const g=this.gl,t=g.createTexture();g.bindTexture(g.TEXTURE_2D,t);g.texImage2D(g.TEXTURE_2D,0,g.RGBA16F,w,h,0,g.RGBA,g.HALF_FLOAT,null);this.textureParams();const fb=g.createFramebuffer();g.bindFramebuffer(g.FRAMEBUFFER,fb);g.framebufferTexture2D(g.FRAMEBUFFER,g.COLOR_ATTACHMENT0,g.TEXTURE_2D,t,0);if(g.checkFramebufferStatus(g.FRAMEBUFFER)!==g.FRAMEBUFFER_COMPLETE)throw new Error('Incomplete HDR framebuffer.');const result={t,fb,w,h};this.resources.push(result);return result;}
+ setQuality(q){if(!(q in GL_QUALITY))throw new Error('Unknown quality');this.quality=q;this.resize(true);}
+ resize(force=false,width=0,height=0){if(!this.ready)return;const rect=this.canvas.getBoundingClientRect(),dpr=Math.min(devicePixelRatio||1,2);let w=Math.round(width||rect.width*dpr),h=Math.round(height||rect.height*dpr);if(w<2||h<2)return;const max=this.device.limits.maxTextureDimension2D;let scale=Math.min(1,Math.sqrt(GL_QUALITY[this.quality].pixels/(w*h)),max/w,max/h);if(width&&height)scale=Math.min(1,max/w,max/h);w=Math.max(2,Math.round(w*scale/2)*2);h=Math.max(2,Math.round(h*scale/2)*2);if(!force&&w===this.width&&h===this.height)return;const g=this.gl;for(const r of this.resources){g.deleteTexture(r.t);g.deleteFramebuffer(r.fb);}this.resources=[];this.width=this.canvas.width=w;this.height=this.canvas.height=h;this.hdr=this.target(w,h);this.bloom=[];for(let i=0;i<4;i++)this.bloom.push([this.target(Math.max(2,w>>(i+1)),Math.max(2,h>>(i+1))),this.target(Math.max(2,w>>(i+1)),Math.max(2,h>>(i+1)))]);}
+ tex(p,name,t,unit){const g=this.gl;g.activeTexture(g.TEXTURE0+unit);g.bindTexture(g.TEXTURE_2D,t);g.uniform1i(this.location(p,name),unit);}
+ postPass(src,dst,settings){const g=this.gl;g.bindFramebuffer(g.FRAMEBUFFER,dst.fb);g.viewport(0,0,dst.w,dst.h);g.useProgram(this.post.p);this.tex(this.post,'inputTexture',src.t,0);for(let i=0;i<4;i++)g.uniform1i(this.location(this.post,`bloom${i}`),0);this.v4(this.post,'settings',settings);g.drawArrays(g.TRIANGLES,0,3);}
+ async render(f,{audioEnergy=0,wait=false}={}){
+  if(!this.ready)return;const start=performance.now(),g=this.gl,{right,up,forward}=cameraBasis(f.camera,f.target),q=GL_QUALITY[this.quality],tan=Math.tan(f.fov*Math.PI/360),aspect=this.width/this.height,energy=f.energy*(1+Math.min(.12,audioEnergy*.12)),orb=[0,.47+f.explode*1.44,0,1.15];
+  g.bindVertexArray(this.vao);g.disable(g.BLEND);g.bindFramebuffer(g.FRAMEBUFFER,this.hdr.fb);g.viewport(0,0,this.width,this.height);g.useProgram(this.scene.p);
+  this.v4(this.scene,'u.resolution',[this.width,this.height,f.time,aspect]);this.v4(this.scene,'u.camera',[...f.camera,tan]);this.v4(this.scene,'u.right',[...right,f.world]);this.v4(this.scene,'u.up',[...up,energy]);this.v4(this.scene,'u.forward',[...forward,f.explode]);this.v4(this.scene,'u.parameters',[f.sun,f.fade,q.steps,audioEnergy]);this.v4(this.scene,'u.orb',orb);this.v4(this.scene,'u.extra',[1,0,0,0]);this.tex(this.scene,'engraving',this.engraving,0);g.drawArrays(g.TRIANGLES,0,3);
+  if(f.world>.5){g.enable(g.BLEND);g.blendFunc(g.ONE,g.ONE);g.useProgram(this.particles.p);this.v4(this.particles,'cam',[...f.camera,tan]);this.v4(this.particles,'right',[...right,0]);this.v4(this.particles,'up',[...up,0]);this.v4(this.particles,'forward',[...forward,0]);this.v4(this.particles,'orb',orb);this.v4(this.particles,'film',[f.time,aspect,energy,0]);g.drawArraysInstanced(g.TRIANGLES,0,6,q.particles);g.disable(g.BLEND);}
+  let prev=this.hdr;for(let i=0;i<4;i++){const[a,b]=this.bloom[i];this.postPass(prev,a,[0,i===0?1:0,0,0]);this.postPass(a,b,[1,0,1,0]);this.postPass(b,a,[1,0,0,1]);prev=a;}
+  g.bindFramebuffer(g.FRAMEBUFFER,null);g.viewport(0,0,this.width,this.height);g.useProgram(this.post.p);this.tex(this.post,'inputTexture',this.hdr.t,0);this.v4(this.post,'settings',[2,0,0,0]);this.v4(this.post,'params',[f.fade,f.time,this.width,this.height]);for(let i=0;i<4;i++)this.tex(this.post,`bloom${i}`,this.bloom[i][0].t,i+1);g.drawArrays(g.TRIANGLES,0,3);
+  if(wait)g.finish();this.frames++;this.gpuMs=this.gpuMs*.9+(performance.now()-start)*.1;
+  const error=g.getError();if(error!==g.NO_ERROR){const msg=`WebGL compatibility error 0x${error.toString(16)}`;if(!this.errors.includes(msg)){this.errors.push(msg);console.error(msg);}}
+ }
+ dispose(){this.ready=false;const g=this.gl;for(const r of this.resources){g.deleteTexture(r.t);g.deleteFramebuffer(r.fb);}for(const p of [this.scene,this.post,this.particles])g.deleteProgram(p.p);g.deleteTexture(this.engraving);g.deleteVertexArray(this.vao);}
+}
+
+// -------- audio.js --------
+/** The licensed orchestral recording is the clock. There is no oscillator imitation. */
+const MUSIC = Object.freeze({
+ title:'Also Sprach Zarathustra — Einleitung',
+ composer:'Richard Strauss',performer:'Kevin MacLeod',license:'CC BY 3.0',
+ url:'https://upload.wikimedia.org/wikipedia/commons/0/0b/Also_Sprach_Zarathustra_-_Einleitung.ogg',
+ source:'https://commons.wikimedia.org/wiki/File:Also_Sprach_Zarathustra_-_Einleitung.ogg',
+ licenseUrl:'https://creativecommons.org/licenses/by/3.0/',
+ sha1:'ab5a1863b4fead3069445bdbcfd0f62ecfd09481'
+});
+class Soundtrack extends EventTarget {
+ constructor(){super();this.offset=0;this.startedAt=0;this.playing=false;this.volume=.75;this.muted=false;this.silent=false;this.energy=[];this.energyHz=30;}
+ async unlock() {
+  if(!this.context){
+   this.context=new AudioContext({latencyHint:'playback'});
+   this.gain=this.context.createGain();this.gain.gain.value=this.muted?0:this.volume;
+   this.gain.connect(this.context.destination);
+   this.destination=this.context.createMediaStreamDestination();this.gain.connect(this.destination);
+  }
+  if(this.context.state==='suspended')await this.context.resume();
+ }
+ async load() {
+  if(this.buffer)return;
+  if(this.loading)return this.loading;
+  this.loading=this._load().finally(()=>this.loading=null);return this.loading;
+ }
+ async _load() {
+  await this.unlock();
+  const urls=['./assets/zarathustra.ogg',MUSIC.url];let last;
+  for(const url of urls){
+   try {
+    this.dispatchEvent(new CustomEvent('status',{detail:url.startsWith('.')?'Checking local score…':'Loading Strauss orchestral recording…'}));
+    let response;
+    if('caches'in window){try{response=await caches.match(url);}catch{}}
+    if(!response){
+     response=await fetch(url,{signal:AbortSignal.timeout(url.startsWith('.')?2500:22000),mode:'cors'});
+     if(!response.ok)throw new Error(`HTTP ${response.status}`);
+     if('caches'in window&&url===MUSIC.url){try{const cache=await caches.open('aether-odyssey-music-v1');await cache.put(url,response.clone());}catch{}}
+    }
+    const raw=await response.arrayBuffer();
+    if(raw.byteLength<10000)throw new Error('The audio response is incomplete.');
+    this.buffer=await this.context.decodeAudioData(raw);
+    this.buildEnvelope();this.dispatchEvent(new CustomEvent('status',{detail:'Strauss · Kevin MacLeod · recording ready'}));return;
+   } catch(e){last=e;}
+  }
+  throw new Error(`The orchestral recording could not be loaded. ${last?.message||''} Use “Choose audio” to open the licensed recording locally, or explicitly choose the silent preview.`);
+ }
+ async importFile(file){
+  await this.unlock();this.pause();this.buffer=await this.context.decodeAudioData(await file.arrayBuffer());this.silent=false;this.offset=0;this.imported=true;this.importedName=file.name;this.buildEnvelope();
+  this.dispatchEvent(new CustomEvent('status',{detail:`Local audio: ${file.name}`}));
+ }
+ buildEnvelope(){
+  const b=this.buffer;if(!b)return;const data=b.getChannelData(0);const stride=Math.max(1,Math.floor(b.sampleRate/this.energyHz));this.energy=new Float32Array(Math.ceil(data.length/stride));let peak=0;
+  for(let n=0;n<this.energy.length;n++){let sum=0,count=0;for(let i=n*stride;i<Math.min(data.length,(n+1)*stride);i+=4){sum+=data[i]*data[i];count++;}this.energy[n]=Math.sqrt(sum/Math.max(1,count));peak=Math.max(peak,this.energy[n]);}
+  if(peak>0)for(let i=0;i<this.energy.length;i++)this.energy[i]/=peak;
+ }
+ energyAt(t){return this.energy[Math.max(0,Math.min(this.energy.length-1,Math.floor(t*this.energyHz)))]||0;}
+ get time(){if(!this.playing)return this.offset;return this.offset+Math.max(0,(this.context?this.context.currentTime:performance.now()/1000)-this.startedAt);}
+ async play(offset=this.offset){
+  await this.unlock();this.stopSource();this.offset=Math.max(0,offset);this.startedAt=this.context.currentTime;
+  if(this.buffer&&!this.silent&&offset<this.buffer.duration){
+   const src=this.context.createBufferSource();src.buffer=this.buffer;src.connect(this.gain);src.start(this.startedAt,offset);this.source=src;
+  }
+  this.playing=true;
+ }
+ pause(){this.offset=this.time;this.playing=false;this.stopSource();}
+ stopSource(){if(this.source){try{this.source.stop();}catch{}this.source.disconnect();this.source=null;}}
+ async seek(t){const playing=this.playing;this.pause();this.offset=Math.max(0,t);if(playing)await this.play(this.offset);}
+ setMuted(muted){this.muted=muted;if(this.gain)this.gain.gain.setTargetAtTime(muted?0:this.volume,this.context.currentTime,.02);}
+ dispose(){this.pause();this.context?.close();}
+}
+
+// -------- export.js --------
+
+/** Captures actual live WebGPU frames; no recording of browser chrome or external services. */
+class LocalFilmRecorder {
+ constructor(renderer,sound){this.renderer=renderer;this.sound=sound;this.active=false;}
+ start(){
+  if(!window.MediaRecorder||!HTMLCanvasElement.prototype.captureStream)throw new Error('This browser does not support local canvas recording. Use the deterministic capture script instead.');
+  this.canvas=document.createElement('canvas');this.canvas.width=this.renderer.width;this.canvas.height=this.renderer.height;
+  this.ctx=this.canvas.getContext('2d',{alpha:false});
+  this.stream=this.canvas.captureStream(30);
+  for(const track of this.sound.destination.stream.getAudioTracks())this.stream.addTrack(track.clone());
+  const mime=['video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/mp4','video/webm'].find(t=>MediaRecorder.isTypeSupported(t));
+  if(!mime)throw new Error('No supported video encoder.');
+  this.chunks=[];this.mime=mime;
+  this.recorder=new MediaRecorder(this.stream,{mimeType:mime,videoBitsPerSecond:14_000_000,audioBitsPerSecond:192_000});
+  this.recorder.ondataavailable=e=>{if(e.data.size)this.chunks.push(e.data);};
+  this.done=new Promise((resolve,reject)=>{this.recorder.onstop=()=>{
+   const blob=new Blob(this.chunks,{type:mime});this.stream.getTracks().forEach(t=>t.stop());
+   const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=`Aether-Orb-Odyssey.${mime.includes('mp4')?'mp4':'webm'}`;a.click();setTimeout(()=>URL.revokeObjectURL(url),30_000);resolve(blob);
+  };this.recorder.onerror=e=>{this.active=false;reject(e.error||new Error('Recording failed.'));};});
+  this.active=true;this.recorder.start(1000);return this.done;
+ }
+ frame(time){
+  if(!this.active)return;const {ctx,canvas}=this;const w=canvas.width,h=canvas.height;const f=sampleFilm(time,w/h);
+  ctx.globalAlpha=1;ctx.fillStyle='#04060b';ctx.fillRect(0,0,w,h);ctx.drawImage(this.renderer.canvas,0,0,w,h);
+  const title=f.title;if(!title)return;
+  const center=title.align.startsWith('center');const x=center?w*.5:w*.08;const y=title.align==='center-top'?h*.07:title.align==='center'?h*.36:(w/h<1.25?h*.12:h*.29);
+  const base=title.align==='center-top'?w*.058:title.size==='hero'?w*.08:title.size==='medium'?w*.044:title.size==='quiet'?w*.044:w*.052;
+  const fs=w/h<1.25?(title.size==='hero'?w*.14:w*.09):base;
+  ctx.textAlign=center?'center':'left';ctx.textBaseline='top';ctx.globalAlpha=f.titleOpacity;
+  ctx.fillStyle='#bdc4d4';ctx.font=`500 ${Math.max(9,w*.0055)}px Arial`;ctx.fillText(title.kicker,x,y);
+  ctx.fillStyle='#eeeff3';ctx.font=`${title.size==='hero'?'200':'300'} ${fs}px "Helvetica Neue", Arial`;
+  for(let i=0;i<title.lines.length;i++){
+   const p=ease(clamp(f.titleProgress-i*.07));ctx.globalAlpha=f.titleOpacity*p;
+   ctx.fillText(title.lines[i],x,y+h*.043+i*fs*1.06+(1-p)*fs*.45);
+  }
+  ctx.globalAlpha=f.titleOpacity;ctx.fillStyle='#a9b5cb';ctx.font=`300 ${title.size==='hero'?w*.015:Math.max(9,w*.009)}px Arial`;
+  let sy=y+h*.043+title.lines.length*fs*1.06+h*.027;
+  ctx.fillText(title.sub,x,sy);
+  if(title.cta){ctx.font=`400 ${Math.max(11,w*.009)}px Arial`;ctx.fillStyle='#dce5f5';ctx.fillText('Explore CrystalBall  ↗',x,sy+h*.065);}
+  if(time>79){ctx.textAlign='center';ctx.fillStyle='#a5afc1';ctx.font=`400 ${Math.max(9,w*.006)}px Arial`;ctx.fillText(this.sound.imported?'Concept film · User-supplied audio: '+this.sound.importedName:'Music: Richard Strauss / Kevin MacLeod · incompetech.com · creativecommons.org/licenses/by/3.0/',w*.5,h*.951);}
+  ctx.globalAlpha=1;
+ }
+ stop(){if(this.active){this.active=false;this.recorder.stop();}return this.done;}
+}
+
+// -------- app.js --------
+
+const $=s=>document.querySelector(s);
+const stage=$('#stage'),world=$('#world'),params=new URLSearchParams(location.search);
+const initialQuality=params.get('quality')||'balanced';
+const RendererType=navigator.gpu&&!params.has('compat')?FilmRenderer:CompatibilityRenderer;
+const renderer=new RendererType(world,{quality:initialQuality});
+const soundtrack=new Soundtrack();
+const recorder=new LocalFilmRecorder(renderer,soundtrack);
+let running=false,started=false,ended=false,manualTime=0,busy=false,pendingFrame=null,lastTitle=null,hideTimer,recording=false;
+let scrubWasRunning=false,creditsWasRunning=false;
+const format=t=>`${String(Math.floor(t/60)).padStart(2,'0')}:${String(Math.floor(t%60)).padStart(2,'0')}`;
+const timeNow=()=>running?Math.min(soundtrack.time,DURATION):manualTime;
+
+function revealControls(){document.body.classList.remove('idle');clearTimeout(hideTimer);if(running)hideTimer=setTimeout(()=>{if($('#credits').open||!$('#chapters').hidden)return;document.body.classList.add('idle');},2600);}
+function transport(t){
+ $('#scrub').value=t;$('#scrub').style.setProperty('--progress',`${100*t/DURATION}%`);
+ $('#timecode').innerHTML=`${format(t)} <i>/</i> 01:26`;
+ $('#playPause').textContent=running?'Ⅱ':'▶';$('#playPause').setAttribute('aria-label',running?'Pause':'Play');
+}
+function titleFrame(f){
+ const t=f.title;$('#filmType').hidden=!started||!t;
+ if(!started||!t){lastTitle=null;return;}
+ const el=$('#filmType');el.dataset.align=t.align;el.dataset.size=t.size;
+ if(t!==lastTitle){
+  $('#kicker').textContent=t.kicker;$('#subtitle').textContent=t.sub;$('#projectLink').hidden=!t.cta;
+  $('#titleLines').replaceChildren(...t.lines.map(line=>{const outer=document.createElement('span');outer.className='line';const inner=document.createElement('span');inner.textContent=line;outer.append(inner);return outer;}));lastTitle=t;
+ }
+ el.style.opacity=f.titleOpacity;
+ const lines=$('#titleLines').children;
+ for(let i=0;i<lines.length;i++){
+  const p=ease(clamp(f.titleProgress-i*.07));const span=lines[i].firstChild;
+  span.style.transform=`translateY(${(1-p)*105}%)`;span.style.opacity=p;
+ }
+ $('#kicker').style.opacity=ease(f.titleProgress*1.6);
+ $('#subtitle').style.opacity=ease(clamp(f.titleProgress*1.8-.6));
+}
+async function paint(time,{force=false,poster=false}={}){
+ if(!renderer.ready)return;
+ if(busy&&!force){pendingFrame={time,poster};return;}
+ if(busy&&force){await renderer.device.queue.onSubmittedWorkDone();}
+ busy=true;
+ try {
+  const rect=world.getBoundingClientRect();const f=sampleFilm(time,rect.width/rect.height);
+  await renderer.render(f,{audioEnergy:soundtrack.energyAt(time),wait:true});
+  titleFrame(f);
+  const slug=`${String(SHOTS.indexOf(f.shot)+1).padStart(2,'0')} / ${f.shot.name.toUpperCase()}`;
+  $('#chapterSlug').textContent=started?slug:'';
+  $('#assembly-labels').style.opacity=started&&f.shot.name==='Architecture'?ease((time-59)/1.5)*ease((68.4-time)/.8)*.8:0;
+  if(!poster)transport(ended?DURATION:time);
+  if(recording)recorder.frame(time);
+ } finally{busy=false;}
+ if(pendingFrame&&!force){const next=pendingFrame;pendingFrame=null;queueMicrotask(()=>paint(next.time,{poster:next.poster}));}
+}
+function fatal(error){running=false;soundtrack.pause();document.body.classList.remove('playing');$('#fatal').hidden=false;$('#fatalText').textContent=error?.message||String(error);$('#loadStatus').textContent='Renderer unavailable';console.error(error);}
+function audioError(error){$('#audioErrorText').textContent=error.message;$('#audioError').hidden=false;$('#start').disabled=false;$('#startLabel').textContent='Watch the film';}
+async function start({silent=false,from=0,skipLoad=false}={}){
+ if(!renderer.ready)return;
+ $('#start').disabled=true;$('#audioError').hidden=true;
+ try {
+  await soundtrack.unlock();
+  if(!silent&&!skipLoad)await soundtrack.load();
+  soundtrack.silent=silent;started=true;ended=false;manualTime=clamp(from,0,DURATION);
+  $('#gate').hidden=true;$('#start').disabled=false;$('#filmType').hidden=false;
+  await soundtrack.play(manualTime);running=true;document.body.classList.add('playing');revealControls();
+  $('#loadStatus').textContent=silent?'Silent preview':'Orchestra ready';
+ }catch(e){audioError(e);}
+}
+function pause(){
+ if(!running)return;manualTime=clamp(soundtrack.time,0,DURATION);soundtrack.pause();running=false;
+ document.body.classList.remove('playing','idle');transport(manualTime);
+}
+async function toggle(){
+ if(running){pause();return;}
+ if(!started||ended){await start({silent:soundtrack.silent,from:0});return;}
+ if(!soundtrack.buffer&&!soundtrack.silent){await start({from:manualTime});return;}
+ await soundtrack.play(manualTime);running=true;document.body.classList.add('playing');revealControls();
+}
+async function seek(time,{resume=false}={}){
+ pause();started=true;ended=false;$('#gate').hidden=true;manualTime=clamp(time,0,DURATION);soundtrack.offset=manualTime;
+ await paint(manualTime,{force:true});
+ if(resume&&!soundtrack.buffer&&!soundtrack.silent){await start({from:manualTime});return;}
+ if(resume){await soundtrack.play(manualTime);running=true;document.body.classList.add('playing');revealControls();}
+}
+async function tick(){
+ try {
+  if(running&&!busy){
+   const t=timeNow();await paint(t);
+   if(t>=DURATION){
+    pause();manualTime=DURATION;ended=true;
+    if(recording){recording=false;document.body.classList.remove('recording');await recorder.stop();$('#recordStatus').textContent='Recording saved.';}
+    await paint(84.7);transport(DURATION);
+   }
+  }
+ }catch(e){fatal(e);}
+ requestAnimationFrame(tick);
+}
+async function fullscreen(){try{if(document.fullscreenElement)await document.exitFullscreen();else await stage.requestFullscreen();}catch(e){$('#loadStatus').textContent=e.message;}}
+function updateDiagnostics(){
+ $('#diagnostics').textContent=JSON.stringify({renderer:renderer.backend||'Native WebGPU / WGSL',resolution:`${renderer.width} × ${renderer.height}`,quality:renderer.quality,completedFrames:renderer.frames,submissionAndCompletionMs:Math.round(renderer.gpuMs*10)/10,shaderErrors:renderer.errors,adapter:renderer.adapterInfo,music:soundtrack.buffer?`${soundtrack.buffer.duration.toFixed(2)} s / ${soundtrack.buffer.sampleRate} Hz`:'Not yet loaded',recording:recording},null,2);
+}
+$('#start').addEventListener('click',()=>start());$('#playPause').addEventListener('click',toggle);
+$('#restart').addEventListener('click',()=>start({silent:soundtrack.silent}));
+$('#sound').addEventListener('click',()=>{soundtrack.setMuted(!soundtrack.muted);document.body.classList.toggle('muted',soundtrack.muted);$('#soundLabel').textContent=soundtrack.muted?'Muted':'Sound on';$('#sound').setAttribute('aria-pressed',String(!soundtrack.muted));});
+$('#fullscreen').addEventListener('click',fullscreen);
+$('#quality').value=renderer.quality;
+$('#quality').addEventListener('change',async()=>{if(recording)return;await renderer.device.queue.onSubmittedWorkDone();renderer.setQuality($('#quality').value);await paint(started?(ended?84.7:timeNow()):82.0,{force:true,poster:!started});});
+$('#chaptersButton').addEventListener('click',()=>{$('#chapters').hidden=!$('#chapters').hidden;$('#chaptersButton').setAttribute('aria-expanded',String(!$('#chapters').hidden));revealControls();});
+SHOTS.forEach((shot,i)=>{
+ const b=document.createElement('button');b.innerHTML=`<span>${String(i+1).padStart(2,'0')}</span>${shot.name}<i>${format(shot.start)}</i>`;
+ b.addEventListener('click',async()=>{$('#chapters').hidden=true;$('#chaptersButton').setAttribute('aria-expanded','false');await seek(shot.start+.60);});$('#chapters').append(b);
+ if(i>0){const mark=document.createElement('i');mark.style.left=`${shot.start/DURATION*100}%`;$('#chapterMarks').append(mark);}
+});
+$('#scrub').addEventListener('pointerdown',()=>{scrubWasRunning=running;pause();});
+$('#scrub').addEventListener('input',()=>{started=true;$('#gate').hidden=true;ended=false;manualTime=Number($('#scrub').value);soundtrack.offset=manualTime;paint(manualTime);});
+$('#scrub').addEventListener('change',()=>{const resume=scrubWasRunning;scrubWasRunning=false;seek(Number($('#scrub').value),{resume});});
+$('#creditsButton').addEventListener('click',()=>{creditsWasRunning=running;pause();updateDiagnostics();$('#credits').showModal();});
+$('#credits').addEventListener('close',()=>{if(creditsWasRunning&&!recording){creditsWasRunning=false;toggle();}});
+$('#retryAudio').addEventListener('click',()=>start());
+$('#silent').addEventListener('click',()=>start({silent:true}));
+$('#audioFile').addEventListener('change',async e=>{const file=e.target.files?.[0];if(!file)return;try{await soundtrack.importFile(file);await start({skipLoad:true});}catch(error){audioError(error);}});
+$('#recordFilm').addEventListener('click',async()=>{
+ if(recording)return;
+ try {
+  await soundtrack.unlock();await soundtrack.load();pause();creditsWasRunning=false;$('#credits').close();
+  await seek(0);const result=recorder.start();result.catch(error=>{recording=false;document.body.classList.remove('recording');$('#recordStatus').textContent=error.message;});
+  recording=true;document.body.classList.add('recording');$('#recordStatus').textContent='Recording…';await start();
+ }catch(e){$('#recordStatus').textContent=e.message;}
+});
+soundtrack.addEventListener('status',e=>$('#loadStatus').textContent=e.detail);
+renderer.addEventListener('lost',e=>fatal(e.detail));renderer.addEventListener('error',e=>fatal(e.detail));
+window.addEventListener('pointermove',revealControls,{passive:true});window.addEventListener('pointerdown',revealControls,{passive:true});
+window.addEventListener('keydown',async e=>{
+ if(e.target.matches('input,select,textarea')||$('#credits').open)return;
+ if(['Space','ArrowLeft','ArrowRight','KeyR','KeyM','KeyF','KeyC'].includes(e.code))e.preventDefault();
+ switch(e.code){case'Space':await toggle();break;case'ArrowLeft':await seek(timeNow()-5,{resume:running});break;case'ArrowRight':await seek(timeNow()+5,{resume:running});break;case'KeyR':await start({silent:soundtrack.silent});break;case'KeyM':$('#sound').click();break;case'KeyF':await fullscreen();break;case'KeyC':$('#creditsButton').click();break;}
+ revealControls();
+});
+document.addEventListener('visibilitychange',()=>{if(document.hidden)pause();});
+let resizeTimer;window.addEventListener('resize',()=>{clearTimeout(resizeTimer);resizeTimer=setTimeout(async()=>{if(!renderer.ready||recording)return;await renderer.device.queue.onSubmittedWorkDone();renderer.resize();if(!running)await paint(started?(ended?84.7:manualTime):82,{poster:!started});},120);});
+
+const ready=(async()=>{
+ try {
+  await renderer.init();await document.fonts.ready;
+  $('#backend').textContent=renderer.backend?'WEBGL2 COMPATIBILITY':'NATIVE WEBGPU';
+  if(params.has('capture'))document.body.classList.add('capture-mode');
+  if(params.has('time')){started=true;$('#gate').hidden=true;manualTime=clamp(Number(params.get('time')),0,DURATION);await paint(manualTime,{force:true});}
+  else await paint(82.0,{force:true,poster:true});
+  $('#start').disabled=false;$('#startLabel').textContent='Watch the film';$('#loadStatus').textContent='Headphones recommended. Sound starts with playback.';
+  requestAnimationFrame(tick);return true;
+ }catch(e){fatal(e);return false;}
+})();
+// Public deterministic capture interface. It deliberately does not auto-play sound.
+window.__film={
+ ready,renderer,soundtrack,get state(){return {running,started,ended,time:timeNow(),errors:renderer.errors};},
+ async frame(time,{width=0,height=0,quality=null,clean=true}={}){
+  if(!await ready)throw new Error('Renderer initialization failed.');pause();pendingFrame=null;started=true;ended=false;manualTime=clamp(time,0,DURATION);$('#gate').hidden=true;
+  if(clean)document.body.classList.add('capture-mode');else document.body.classList.remove('capture-mode');
+  if(quality)renderer.setQuality(quality);if(width&&height)renderer.resize(true,width,height);
+  await paint(manualTime,{force:true});return {time:manualTime,width:renderer.width,height:renderer.height,errors:renderer.errors};
+ },play:()=>start(),playSilent:()=>start({silent:true}),pause,seek,
+ async png(time,opts={}){await this.frame(time,opts);return world.toDataURL('image/png');},
+ music:MUSIC,duration:DURATION,shots:SHOTS
+};
+
+</script>
+</body></html>
