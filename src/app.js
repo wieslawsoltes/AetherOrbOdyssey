@@ -207,10 +207,13 @@ async function startRecording({from=0,to=DURATION}={}){
    recording=false;pause();updateRecordingUI();
    $('#loadStatus').textContent=error.message;
   });
-  await paint(from,{force:true}); // Supply a complete initial frame before waiting for onstart.
-  await recorder.ready;
+  await paint(from,{force:true}); // Prime video before awaiting encoder readiness.
+  // Some Chrome encoders wait for input from EVERY track before firing onstart.
+  // Feed the soundtrack and rendering loop first; waiting for ready here would
+  // deadlock a second recording whose previous source has already been stopped.
   if(!await soundtrack.play(from))throw new Error('Recording playback was cancelled.');
   running=true;started=true;ended=false;$('#gate').hidden=true;
+  await recorder.ready;
   document.body.classList.add('playing');$('#credits').close();revealControls();updateSoundControl();
  }catch(error){
   recorder.fail(error);recording=false;pause();

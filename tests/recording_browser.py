@@ -49,9 +49,9 @@ async def run(args):
             launch['args']+=['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader','--enable-unsafe-webgpu','--use-webgpu-adapter=swiftshader']
         if args.executable:launch['executable_path']=args.executable
         elif args.chrome:launch['channel']='chrome'
-        else:launch['channel']='chromium' # Full Chromium/new headless, not headless_shell.
+        else:launch['channel']='chrome' if shutil.which('google-chrome') else 'chromium' # Full browser, not headless_shell.
         browser=await p.chromium.launch(**launch);report['browser']=browser.version
-        report['browserProduct']='Google Chrome' if args.chrome else 'Chromium'
+        report['browserProduct']='Google Chrome' if launch.get('channel')=='chrome' else 'Chromium'
         page=await browser.new_page(viewport={'width':960,'height':540},accept_downloads=True)
         page.on('pageerror',lambda e:report['errors'].append(str(e)))
         report['console']=[]

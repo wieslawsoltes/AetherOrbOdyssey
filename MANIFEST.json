@@ -20,8 +20,8 @@
     "sha256": "e2e1581a9bb133db3cc6b58efd7986b07a65a52e469db5032154f83995f03dd8"
   },
   ".github/workflows/repair-recording.yml": {
-    "bytes": 6097,
-    "sha256": "9814aa99c960ef95d73d69c2aaa572bf7f71c81f51dfb57e396a652d76f65da2"
+    "bytes": 4949,
+    "sha256": "b06c01c097820ec29b1533a643085360d56212f9418eea2f361628bd65bf7b53"
   },
   ".gitignore": {
     "bytes": 110,
@@ -32,8 +32,8 @@
     "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
   },
   "Aether-Orb-Odyssey.html": {
-    "bytes": 118196,
-    "sha256": "f3cdb71f6c46e499506fd1b50d225036741e92ddcc1fe94e15a742a53ba669a3"
+    "bytes": 118425,
+    "sha256": "7bf01283265777ef3030755bfa4ae7731506cb376b354b17ca6fe10d4ce54e4e"
   },
   "NOTICE.md": {
     "bytes": 3500,
@@ -56,8 +56,8 @@
     "sha256": "6b49cb9b654cea12e53c23bddf059c3e765ee57bdff2974a433a5ac7591f20b6"
   },
   "docs/CHROME-RECORDING.md": {
-    "bytes": 3978,
-    "sha256": "3fedbb28caaf3fa0b8f72a94ad1c7ace5893544106aa6179274dc1ca167534e7"
+    "bytes": 4559,
+    "sha256": "c6a0f1f926deef9dc5544d6cbb661143cb60c1d1142fa4d76ebd2b05f833a441"
   },
   "docs/IMPORT-PROVENANCE.md": {
     "bytes": 1101,
@@ -184,8 +184,8 @@
     "sha256": "2be75b7e81a2894387f020783f770e882fdd19679d62c843aedd4353e646cdaf"
   },
   "src/app.js": {
-    "bytes": 19132,
-    "sha256": "76194b101bc8991b7734bf869a03eff5637add3c74a7d2c71f8f67f4b9f450df"
+    "bytes": 19361,
+    "sha256": "539e881a55dec90ab588fcc9e224bfd0bb8a6399c844a61bd07889d20b8df636"
   },
   "src/audio.js": {
     "bytes": 8295,
@@ -236,8 +236,8 @@
     "sha256": "1708357d6e7d6b8e21447bd1e7b636c6089e6695b4cf52e2d7a2f231cae9b968"
   },
   "tests/recording_browser.py": {
-    "bytes": 11395,
-    "sha256": "2e9c57afe56575ecd01be4e4deae9a033f7515a866e2718254eb6174c68b7ae1"
+    "bytes": 11448,
+    "sha256": "6b34de2e17410f9d17e49b8638e73c3c30cfba09e1958b171b02d44df1604649"
   },
   "tests/test_encode_music.py": {
     "bytes": 2435,
